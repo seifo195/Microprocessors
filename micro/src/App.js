@@ -1,11 +1,13 @@
 import './App.css';
 import MultRS from './MultRS.js';
+import AddRS from './AddRS.js';
+
 function App() {
   return (
     <div className="App">
       <h1>Tomasulo Algorithm Simulator</h1>
-      <MultRS title="Add Reservation Station" stationSize={3} />
-      <MultRS title="Multiply Reservation Station" stationSize={5} />
+      <AddRS stationSize={4}  />
+      <MultRS stationSize={5} />
     </div>
   );
 }

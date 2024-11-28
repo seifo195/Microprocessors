@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-const MultRS = ({ title, stationSize, operationType }) => {
+const AddRS = ({ title, stationSize, operationType }) => {
   const [stations, setStations] = useState(
     Array.from({ length: stationSize }, () => ({
       busy: false,
@@ -21,23 +21,10 @@ const MultRS = ({ title, stationSize, operationType }) => {
       return updatedStations;
     });
   };
-  
-  const handleChange = () => {
-    updateStation(1, {
-      busy: true,
-      instruction: "MUL.D F0, F2, F4",
-      Vj: 3,
-      Vk: 4,
-      Qj: "Add1",
-      Qk: "Add2",
-      Address: 0x200
-    });
-  }
-  
 
   return (
     <div style={{ margin: "20px" }}>
-      <h2>Multiply Reservation Station</h2>
+      <h2>Add Reservation Station</h2>
       <table border="1" style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
           <tr>
@@ -61,16 +48,14 @@ const MultRS = ({ title, stationSize, operationType }) => {
               <td>{station.Vk ?? "-"}</td>
               <td>{station.Qj ?? "-"}</td>
               <td>{station.Qk ?? "-"}</td>
-              <td>{station.Address ?? "-"}</td>
+              <td>{station.address ?? "-"}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button onClick={handleChange}>
-        Modify RS
-      </button>
     </div>
   );
 };
 
-export default MultRS;
+export default AddRS;
+
