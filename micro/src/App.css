@@ -36,3 +36,33 @@
     transform: rotate(360deg);
   }
 }
+
+.simulator-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.reservation-stations {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rs-row, .memory-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* Make sure each component takes equal width in their row */
+.top-row > *, .rs-row > *, .memory-row > * {
+  flex: 1;
+}
