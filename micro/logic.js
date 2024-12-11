@@ -22,7 +22,8 @@ class storeBuffer{
     }
 }
 class AdditionReservationStation{
-    constructor(busy,operation,Vi,Vj,Qi,Qj,A,time){
+    constructor(tag,busy,operation,Vi,Vj,Qi,Qj,A,time){
+        this.tag=tag;
         this.busy=busy;
         this.operation=operation;
         this.Vi=Vi;
@@ -35,7 +36,8 @@ class AdditionReservationStation{
     }
 }
 class MultiplicationReservationStation{
-    constructor(busy,operation,Vi,Vj,Qi,Qj,A,time){
+    constructor(tag,busy,operation,Vi,Vj,Qi,Qj,A,time){
+        this.tag=tag;
         this.busy=busy;
         this.operation=operation;
         this.Vi=Vi;
