@@ -31,6 +31,7 @@ class AdditionReservationStation{
         this.Qj=Qj;
         this.A=A;
         this.time=time;
+        this.result=null;
     }
 }
 class MultiplicationReservationStation{
@@ -43,6 +44,7 @@ class MultiplicationReservationStation{
         this.Qj=Qj;
         this.A=A;
         this.time=time;
+        this.result=null;
     }
 }
 class instructionQueue{
