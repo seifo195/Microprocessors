@@ -53,80 +53,100 @@ class instructionQueue{
     }
 }
 class Cache {
-    constructor(size, blockSize, associativity = 1, hitLatency = 1, missPenalty = 10) {
-        this.size = size;                  // Total number of blocks in the cache
-        this.blockSize = blockSize;        // Number of words in each block
-        this.associativity = associativity; // Associativity level (1 = direct-mapped, size = fully associative)
-        this.hitLatency = hitLatency;      // Cycles for a cache hit
-        this.missPenalty = missPenalty;    // Cycles for a cache miss
-        this.cache = this.initializeCache();
-        this.accessHistory = [];           // For replacement policy (e.g., LRU)
+    constructor(blockSize, cacheSize, hitLatency = 1, missPenalty = 10) {
+        // Size in bytes
+        this.blockSize = blockSize;
+        this.cacheSize = cacheSize;
+        this.numBlocks = Math.floor(cacheSize / blockSize);
+        
+        // Timing parameters
+        this.hitLatency = hitLatency;
+        this.missPenalty = missPenalty;
+        
+        // Cache structure
+        this.blocks = Array(this.numBlocks).fill(null).map(() => ({
+            valid: false,
+            tag: null,
+            data: new Array(blockSize).fill(0),
+            lastUsed: 0
+        }));
+        
+        // Statistics
+        this.hits = 0;
+        this.misses = 0;
     }
 
-    initializeCache() {
-        const numSets = this.size / this.associativity;
-        return Array.from({ length: numSets }, () => 
-            Array.from({ length: this.associativity }, () => ({
-                tag: null,
-                validityBit: 0,
-                block: new Array(this.blockSize).fill(0)
-            }))
-        );
+    // Get block index from address
+    getIndex(address) {
+        return (address / this.blockSize) % this.numBlocks;
     }
 
-    calculateIndexAndTag(address) {
-        const numSets = this.size / this.associativity;
-        const blockOffsetBits = Math.log2(this.blockSize);
-        const indexBits = Math.log2(numSets);
-        const blockOffsetMask = (1 << blockOffsetBits) - 1;
-        const indexMask = (1 << indexBits) - 1;
-
-        const blockOffset = address & blockOffsetMask;
-        const index = (address >> blockOffsetBits) & indexMask;
-        const tag = address >> (blockOffsetBits + indexBits);
-
-        return { tag, index, blockOffset };
+    // Get tag from address
+    getTag(address) {
+        return Math.floor(address / (this.blockSize * this.numBlocks));
     }
 
+    // Access memory at given address
     access(address) {
-        const { tag, index, blockOffset } = this.calculateIndexAndTag(address);
-        const set = this.cache[index];
+        const index = this.getIndex(address);
+        const tag = this.getTag(address);
+        const block = this.blocks[index];
 
-        // Check for hit
-        for (const block of set) {
-            if (block.validityBit && block.tag === tag) {
-                return { hit: true, data: block.block[blockOffset], cycles: this.hitLatency };
-            }
+        // Cache hit
+        if (block.valid && block.tag === tag) {
+            this.hits++;
+            block.lastUsed = Date.now();
+            return {
+                hit: true,
+                cycles: this.hitLatency,
+                data: block.data[address % this.blockSize]
+            };
         }
 
-        // Handle miss
-        const blockToReplace = this.selectBlockToReplace(set);
-        this.replaceBlock(blockToReplace, tag, address);
-        return { hit: false, data: null, cycles: this.missPenalty };
+        // Cache miss
+        this.misses++;
+        
+        // Load new block from memory
+        this.blocks[index] = {
+            valid: true,
+            tag: tag,
+            data: this.loadFromMemory(address, this.blockSize),
+            lastUsed: Date.now()
+        };
+
+        return {
+            hit: false,
+            cycles: this.missPenalty,
+            data: this.blocks[index].data[address % this.blockSize]
+        };
     }
 
-    selectBlockToReplace(set) {
-        // LRU replacement policy
-        for (const block of set) {
-            if (!block.validityBit) return block; // Empty block
-        }
-
-        // Fall back to replacing the least recently used block
-        const lruBlock = set.reduce((prev, curr) => 
-            (this.accessHistory[prev.tag] < this.accessHistory[curr.tag] ? prev : curr)
-        );
-        return lruBlock;
+    // Simulate loading data from main memory
+    loadFromMemory(address, size) {
+        // In a real implementation, this would fetch from main memory
+        // For simulation, we'll just return an array of zeros
+        return new Array(size).fill(0);
     }
 
-    replaceBlock(block, tag, address) {
-        block.tag = tag;
-        block.validityBit = 1;
-        block.block = this.fetchDataFromMemory(address);
-        this.accessHistory[tag] = Date.now(); // Update access timestamp
+    // Get cache statistics
+    getStats() {
+        return {
+            hits: this.hits,
+            misses: this.misses,
+            hitRate: this.hits / (this.hits + this.misses || 1),
+            totalAccesses: this.hits + this.misses
+        };
     }
 
-    fetchDataFromMemory(address) {
-        return new Array(this.blockSize).fill(0); // Simulate memory fetch
+    // Clear cache
+    clear() {
+        this.blocks.forEach(block => {
+            block.valid = false;
+            block.tag = null;
+            block.data.fill(0);
+        });
+        this.hits = 0;
+        this.misses = 0;
     }
 }
 
