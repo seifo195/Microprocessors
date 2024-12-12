@@ -7,6 +7,7 @@ import Load from './Components/Load.js';
 import Store from './Components/Store.js'; 
 import { useState, useEffect } from 'react';
 import { TomasuloController } from './logic/logic.js';
+import { parseInstruction } from './instructionParser.js';
 
 function App() {
   const [controller] = useState(() => new TomasuloController());
@@ -31,12 +32,35 @@ function App() {
     mult: 5
   });
 
+  const [instructions, setInstructions] = useState([]);
+  const [parsedInstructions, setParsedInstructions] = useState([]);
+
+  // Function to handle applying all changes
+  const handleApplyChanges = () => {
+    setStationSizes({
+      load: tempConfig.load,
+      store: tempConfig.store,
+      add: tempConfig.add,
+      mult: tempConfig.mult
+    });
+    setCacheConfig({
+      cacheSize: tempConfig.cacheSize,
+      blockSize: tempConfig.blockSize
+    });
+  };
+
   // Update input handlers to modify temporary state
   const handleTempChange = (type, value) => {
     setTempConfig(prev => ({
       ...prev,
       [type]: parseInt(value) || 0
     }));
+  };
+
+  // Add this function to handle new instructions
+  const handleNewInstruction = (instructionString) => {
+    const parsedInstruction = parseInstruction(instructionString);
+    setParsedInstructions(prev => [...prev, parsedInstruction]);
   };
 
   const options = [
@@ -207,6 +231,33 @@ function App() {
         </button>
       </div>
 
+      <div className="file-upload">
+        <input
+          type="file"
+          accept=".txt"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                const newInstructions = [];
+                lines.forEach(line => {
+                  if (line.trim()) {
+                    const parsed = parseInstruction(line.trim());
+                    newInstructions.push(parsed);
+                  }
+                });
+                setParsedInstructions(newInstructions);
+              };
+              reader.readAsText(file);
+            }
+          }}
+        />
+        <label>Upload Instructions File</label>
+      </div>
+
       <div className="simulator-layout">
         {/* Top row */}
         <div className="top-row">
@@ -225,6 +276,11 @@ function App() {
             <Store stationSize={stationSizes.store} />
           </div>
         </div>
+      </div>
+
+      <div style={{margin: '20px', textAlign: 'left'}}>
+        <h3>Parsed Instructions:</h3>
+        <pre>{JSON.stringify(parsedInstructions, null, 2)}</pre>
       </div>
     </div>
   );
