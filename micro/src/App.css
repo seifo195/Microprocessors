@@ -36,3 +36,71 @@
     transform: rotate(360deg);
   }
 }
+
+.simulator-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.reservation-stations {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rs-row, .memory-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* Make sure each component takes equal width in their row */
+.top-row > *, .rs-row > *, .memory-row > * {
+  flex: 1;
+}
+
+.apply-button {
+  padding: 8px 16px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.apply-button:hover {
+  background-color: #45a049;
+}
+
+.apply-button:active {
+  background-color: #3d8b40;
+}
+
+.config-controls select {
+  padding: 5px;
+  min-width: 120px;
+}
+
+.config-controls optgroup {
+  font-weight: bold;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-group input[type="number"] {
+  width: 80px;
+  padding: 5px;
+}

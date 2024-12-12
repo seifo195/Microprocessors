@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from "react";
 
-const MultRS = ({ stationSize }) => {
+const Load = ({ stationSize }) => {
   const [stations, setStations] = useState(
     Array.from({ length: stationSize }, () => ({
       busy: false,
       instruction: "",
-      Vj: null,
-      Vk: null,
-      Qj: null,
-      Qk: null,
       address: null,
+      V: null,
+      Q: null,
     }))
   );
 
@@ -18,16 +16,13 @@ const MultRS = ({ stationSize }) => {
       Array.from({ length: stationSize }, () => ({
         busy: false,
         instruction: "",
-        Vj: null,
-        Vk: null,
-        Qj: null,
-        Qk: null,
         address: null,
+        V: null,
+        Q: null,
       }))
     );
   }, [stationSize]);
 
-  // Function to update a specific station programmatically
   const updateStation = (index, updatedFields) => {
     setStations((prevStations) => {
       const updatedStations = [...prevStations];
@@ -35,34 +30,19 @@ const MultRS = ({ stationSize }) => {
       return updatedStations;
     });
   };
-  
-  const handleChange = () => {
-    updateStation(1, {
-      busy: true,
-      instruction: "MUL.D F0, F2, F4",
-      Vj: 3,
-      Vk: 4,
-      Qj: "Add1",
-      Qk: "Add2",
-      Address: 0x200
-    });
-  }
-  
 
   return (
     <div style={{ margin: "20px" }}>
-      <h2>Multiply Reservation Station</h2>
+      <h2>Load Buffer</h2>
       <table border="1" style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
           <tr>
             <th>#</th>
             <th>Busy</th>
             <th>Instruction</th>
-            <th>Vj</th>
-            <th>Vk</th>
-            <th>Qj</th>
-            <th>Qk</th>
             <th>Address</th>
+            <th>V</th>
+            <th>Q</th>
           </tr>
         </thead>
         <tbody>
@@ -71,20 +51,15 @@ const MultRS = ({ stationSize }) => {
               <td>{index + 1}</td>
               <td>{station.busy ? "Yes" : "No"}</td>
               <td>{station.instruction}</td>
-              <td>{station.Vj ?? "-"}</td>
-              <td>{station.Vk ?? "-"}</td>
-              <td>{station.Qj ?? "-"}</td>
-              <td>{station.Qk ?? "-"}</td>
-              <td>{station.Address ?? "-"}</td>
+              <td>{station.address ?? "-"}</td>
+              <td>{station.V ?? "-"}</td>
+              <td>{station.Q ?? "-"}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button onClick={handleChange}>
-        Modify RS
-      </button>
     </div>
   );
 };
 
-export default MultRS;
+export default Load;
