@@ -5,9 +5,11 @@ import Regfile from './Components/Regfile.js';
 import InstructionQueue from './Components/instructionqeueu.js';
 import Load from './Components/Load.js';
 import Store from './Components/Store.js'; 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { TomasuloController } from './logic/logic.js';
 
 function App() {
+  const [controller] = useState(() => new TomasuloController());
   const [stationSizes, setStationSizes] = useState({
     load: 3,
     store: 3,
@@ -28,20 +30,6 @@ function App() {
     add: 4,
     mult: 5
   });
-
-  // Function to handle applying all changes
-  const handleApplyChanges = () => {
-    setStationSizes({
-      load: tempConfig.load,
-      store: tempConfig.store,
-      add: tempConfig.add,
-      mult: tempConfig.mult
-    });
-    setCacheConfig({
-      cacheSize: tempConfig.cacheSize,
-      blockSize: tempConfig.blockSize
-    });
-  };
 
   // Update input handlers to modify temporary state
   const handleTempChange = (type, value) => {
@@ -78,6 +66,62 @@ function App() {
     'BEQ'
   ];
   
+  // Log updated station sizes and cache config after they change
+  useEffect(() => {
+    console.log('Updated station sizes:', {
+      'Add RS': stationSizes.add,
+      'Mult RS': stationSizes.mult,
+      'Load RS': stationSizes.load,
+      'Store RS': stationSizes.store
+    });
+
+    console.log('Updated cache config:', {
+      'Cache Size': cacheConfig.cacheSize,
+      'Block Size': cacheConfig.blockSize
+    });
+  }, [stationSizes, cacheConfig]);
+
+  const handleConfigUpdate = (newConfig) => {
+    // Log the new configuration
+    console.log('Applying new configuration:');
+    console.log({
+      'Add RS Size': newConfig.add,
+      'Multiply RS Size': newConfig.mult,
+      'Load RS Size': newConfig.load,
+      'Store RS Size': newConfig.store,
+      'Cache Size (bytes)': newConfig.cacheSize,
+      'Block Size (bytes)': newConfig.blockSize
+    });
+
+    // Update the controller
+    controller.updateConfiguration({
+      addStations: newConfig.add,
+      multStations: newConfig.mult,
+      loadStations: newConfig.load,
+      storeStations: newConfig.store,
+      cacheSize: newConfig.cacheSize,
+      blockSize: newConfig.blockSize
+    });
+
+    // Update local UI state
+    setStationSizes({
+      load: newConfig.load,
+      store: newConfig.store,
+      add: newConfig.add,
+      mult: newConfig.mult
+    });
+
+    setCacheConfig({
+      cacheSize: newConfig.cacheSize,
+      blockSize: newConfig.blockSize
+    });
+  };
+
+  const handleLatencyUpdate = (newLatencies) => {
+    controller.updateLatencies(newLatencies);
+    // Force a re-render or update state as needed
+  };
+
   return (
     <div className="App">   
       <h1>Tomasulo Algorithm Simulator</h1>
@@ -155,7 +199,10 @@ function App() {
       </div>
 
       <div className="config-controls">
-        <button className="apply-button" onClick={handleApplyChanges}>
+        <button 
+          className="apply-button" 
+          onClick={() => handleConfigUpdate(tempConfig)}
+        >
           Apply Changes
         </button>
       </div>
