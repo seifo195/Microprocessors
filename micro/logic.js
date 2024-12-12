@@ -1,3 +1,4 @@
+// Register File
 class registerFile{
     constructor(name,data,availability){
         this.name = name;
@@ -5,6 +6,18 @@ class registerFile{
         this.content = content;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+// Load Buffer
 class loadBuffer{
     constructor(name,busy,address){
         this.name=name;
@@ -12,6 +25,18 @@ class loadBuffer{
         this.address=address;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+// Store Buffer
 class storeBuffer{
     constructor(busy,A,V,Q,Name){
         this.busy=busy;
@@ -21,6 +46,18 @@ class storeBuffer{
         this.Name=Name;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+// Addition Reservation Station
 class AdditionReservationStation {
     constructor(tag, busy, operation, Vi, Vj, Qi, Qj, A, time) {
         this.tag = tag;
@@ -126,6 +163,18 @@ class AdditionReservationStation {
 
 }
 
+
+
+
+
+
+
+
+
+
+
+
+// Multiplication Reservation Station
 class MultiplicationReservationStation {
     constructor(tag, busy, operation, Vi, Vj, Qi, Qj, A, time) {
         this.tag = tag;
@@ -242,6 +291,7 @@ class MultiplicationReservationStation {
 
 }
 
+// Instruction Queue
 class instructionQueue{
     constructor(issue,execute,write){
         this.issue=issue;
@@ -249,6 +299,18 @@ class instructionQueue{
         this.write=write;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+// Cache
 class Cache {
     constructor(blockSize, cacheSize, hitLatency = 1, missPenalty = 10) {
         // Size in bytes
@@ -347,12 +409,23 @@ class Cache {
     }
 }
 
+// Common Data Bus
 class commonDataBus{
     constructor(tag,content){
         this.tag=tag;
         this.content=content;
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 // Load Reservation Station
 class LoadReservationStation {
@@ -412,6 +485,16 @@ class LoadReservationStation {
         return this.busy;
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 // Store Reservation Station
 class StoreReservationStation {
