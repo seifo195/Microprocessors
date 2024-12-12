@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-const MultRS = ({ title, stationSize, operationType }) => {
+const MultRS = ({ stationSize }) => {
   const [stations, setStations] = useState(
     Array.from({ length: stationSize }, () => ({
       busy: false,
@@ -12,6 +12,20 @@ const MultRS = ({ title, stationSize, operationType }) => {
       address: null,
     }))
   );
+
+  useEffect(() => {
+    setStations(
+      Array.from({ length: stationSize }, () => ({
+        busy: false,
+        instruction: "",
+        Vj: null,
+        Vk: null,
+        Qj: null,
+        Qk: null,
+        address: null,
+      }))
+    );
+  }, [stationSize]);
 
   // Function to update a specific station programmatically
   const updateStation = (index, updatedFields) => {

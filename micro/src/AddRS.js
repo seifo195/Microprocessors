@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-const AddRS = ({ title, stationSize, operationType }) => {
+const AddRS = ({ stationSize }) => {
   const [stations, setStations] = useState(
     Array.from({ length: stationSize }, () => ({
       busy: false,
@@ -13,7 +13,20 @@ const AddRS = ({ title, stationSize, operationType }) => {
     }))
   );
 
-  // Function to update a specific station programmatically
+  useEffect(() => {
+    setStations(
+      Array.from({ length: stationSize }, () => ({
+        busy: false,
+        instruction: "",
+        Vj: null,
+        Vk: null,
+        Qj: null,
+        Qk: null,
+        address: null,
+      }))
+    );
+  }, [stationSize]);
+
   const updateStation = (index, updatedFields) => {
     setStations((prevStations) => {
       const updatedStations = [...prevStations];
@@ -48,7 +61,7 @@ const AddRS = ({ title, stationSize, operationType }) => {
               <td>{station.Vk ?? "-"}</td>
               <td>{station.Qj ?? "-"}</td>
               <td>{station.Qk ?? "-"}</td>
-              <td>{station.address ?? "-"}</td>
+              <td>{station.Address ?? "-"}</td>
             </tr>
           ))}
         </tbody>
