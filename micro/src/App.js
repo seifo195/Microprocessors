@@ -1,6 +1,6 @@
 import './App.css';
-import MultRS from './MultRS.js';
-import AddRS from './AddRS.js';
+import MultRS from './Components/MultRS.js';
+import AddRS from './Components/AddRS.js';
 
 function App() {
   return (
