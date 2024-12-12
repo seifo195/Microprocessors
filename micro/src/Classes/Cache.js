@@ -1,5 +1,6 @@
 // Cache
 class Cache {
+
     constructor(blockSize, cacheSize, hitLatency = 1, missPenalty = 10) {
         // Size in bytes
         this.blockSize = blockSize;
@@ -216,3 +217,4 @@ function main() {
 
 // Run the main function
 main();
+export default Cache;
