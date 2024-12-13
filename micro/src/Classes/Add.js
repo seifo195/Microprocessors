@@ -14,7 +14,7 @@ class AdditionReservationStation {
     }
 
     validateOperation() {
-        if (!["DADDI", "DSUBI", "ADD.D", "ADD.S", "SUB.D", "SUB.S"].includes(this.operation)) {
+        if (!["DADDI", "DSUBI", "ADDI", "SUBI", "ADD.D", "ADD.S", "SUB.D", "SUB.S"].includes(this.operation)) {
             throw new Error(`Invalid operation ${this.operation} in station ${this.tag}`);
         }
     }
@@ -22,36 +22,36 @@ class AdditionReservationStation {
     execute() {
         if (!this.busy || this.time <= 0) return;
 
-        // Wait until all dependencies are resolved
-        if (this.Qi !== null || this.Qj !== null) {
-            console.log(`Station ${this.tag} waiting on dependencies Qi: ${this.Qi}, Qj: ${this.Qj}`);
-            return;
-        }
-
-        // Perform the operation only once
         if (!this.operationPerformed) {
             this.validateOperation();
 
+            // Convert values to numbers before operation
+            const vi = Number(this.Vi);
+            const vj = Number(this.Vj);
+
             switch (this.operation) {
-                case "DADDI":
-                case "ADD.D":
-                case "ADD.S":
-                    this.result = this.Vi + this.Vj;
+                case 'ADD.D':
+                case 'ADDI':
+                case 'DADDI':
+                case 'ADD.S':
+                    this.result = Number(vi) + Number(vj);
                     break;
-                case "DSUBI":
-                case "SUB.D":
-                case "SUB.S":
-                    this.result = this.Vi - this.Vj;
+                case 'SUB.D':
+                case 'SUBI':
+                case 'DSUBI':
+                case 'SUB.S':
+                    this.result = Number(vi) - Number(vj);
                     break;
                 default:
-                    console.error(`Unsupported operation: ${this.operation} in station ${this.tag}`);
+                    throw new Error(`Invalid operation ${this.operation} in station ${this.tag}`);
             }
 
-            this.operationPerformed = true; 
+            this.operationPerformed = true;
+            console.log(`${this.tag} performed ${this.operation}: ${vi} ${this.operation.includes('ADD') ? '+' : '-'} ${vj} = ${this.result}`);
         }
 
         if (this.time > 0) {
-            this.time -= 1;
+            this.time--;
         }
     }
 
@@ -70,7 +70,7 @@ class AdditionReservationStation {
             this.A = null;
             this.time = 0;
             this.result = null;
-            this.operationPerformed = false; // Reset the flag for the next operation
+            this.operationPerformed = false;
         }
     }
 
@@ -100,55 +100,6 @@ class AdditionReservationStation {
     isExecuting() {
         return this.time > 0;
     }
-
 }
 
-function main() {
-    console.log("Hello World");
-    const add = new AdditionReservationStation(1, true, "ADD.D", null, null, "Q1", "Q2", null, 5);
-
-    // Simulate the resolution of dependencies
-    setTimeout(() => {
-        add.updateQ("Q1", 10);
-        add.updateQ("Q2", 2);
-    }, 2000);
-
-    const interval = setInterval(() => {
-        console.log(`Clock cycle: ${5 - add.time}`);
-        console.log(`Station state:`, {
-            tag: add.tag,
-            busy: add.busy,
-            operation: add.operation,
-            Vi: add.Vi,
-            Vj: add.Vj,
-            Qi: add.Qi,
-            Qj: add.Qj,
-            A: add.A,
-            time: add.time,
-            result: add.result,
-            operationPerformed: add.operationPerformed
-        });
-
-        add.execute();
-        
-        if (!add.isExecuting()) {
-            clearInterval(interval);
-            console.log(add.broadcast());
-            add.clear();
-            console.log(`Station state after complete:`, {
-                tag: add.tag,
-                busy: add.busy,
-                operation: add.operation,
-                Vi: add.Vi,
-                Vj: add.Vj,
-                Qi: add.Qi,
-                Qj: add.Qj,
-                A: add.A,
-                time: add.time,
-                result: add.result,
-                operationPerformed: add.operationPerformed
-            });        }
-    }, 1000);
-}
-    // main();
 module.exports = AdditionReservationStation;

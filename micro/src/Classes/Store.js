@@ -83,3 +83,4 @@ class StoreReservationStation {
         return this.time >= 0;
     }
 }
+module.exports = StoreReservationStation;

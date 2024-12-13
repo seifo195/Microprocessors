@@ -1,5 +1,5 @@
 class LoadReservationStation {
-    constructor(tag, busy, op, address, Qi, time, cache) {
+    constructor(tag, busy, op, address, Qi=null, time, cache) {
         this.tag = tag; 
         this.busy = busy; 
         this.op = op;
@@ -20,32 +20,15 @@ class LoadReservationStation {
     execute() {
         if (!this.busy || this.time <= 0) return;
 
-        // Wait for dependencies to be resolved
-        if (this.Qi !== null) {
-            console.log(`Load Station ${this.tag} waiting on dependency Qi: ${this.Qi}`);
-            return;
-        }
+        // Decrement time first
+        this.time--;
 
+        // Only perform the load operation once when we start
         if (!this.operationPerformed) {
-            this.validateOperation();
-            // Fetch data from the cache using cacheGet
             const { data, isHit, penalty } = this.cache.cacheGet({ type: this.op }, this.address);
-
-            // Update time with cache penalty if applicable
-            this.time += penalty;
-
-            if (data !== undefined) {
-                this.result = data;
-                console.log(`Load Station ${this.tag} fetched data: ${data} (Cache hit: ${isHit})`);
-            } else {
-                console.error(`Load Station ${this.tag} failed to fetch data at address ${this.address}.`);
-            }
-
+            this.result = data;
             this.operationPerformed = true;
-        }
-
-        if (this.time > 0) {
-            this.time -= 1;
+            console.log(`Load Station ${this.tag} fetched data: ${data} (Cache hit: ${isHit})`);
         }
     }
 
@@ -88,3 +71,5 @@ class LoadReservationStation {
         return this.time > 0;
     }
 }
+
+module.exports = LoadReservationStation;
