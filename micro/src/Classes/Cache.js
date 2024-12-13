@@ -47,185 +47,168 @@ class Cache {
         let blockAddress = this.getBlockAddress(address);
         return (address - (blockAddress*this.blockSize));
     }
-
-    cacheGet(instruction,address) {
-        let flag = true;
-        let blockAddress = this.getBlockAddress(address);
-        let index = this.getIndex(address);
-        if (instruction.type === "LW" || instruction.type === "L.w") {
-            // Check if the 8 values starting from the address are not null
-            // min 8bytes will be brought to cache in case of miss
-            if(this.Cache[blockAddress][index]!== null) {
-                for(let i = 0; i < 8; i++) {
-            }
-            // If all values are not null, proceed with cache hit logic
-            if(this.cache[address] !== null) {
-                
-                return this.cache[address];
-            }
-        }else if (instruction.type === "LD" || instruction.type === "L.D") {
-            this.cache[address] = value;
+    
+    
+    toBinary8Bit(num) {
+        if (num >= 0) {
+            return num.toString(2).padStart(8, '0');
+        } else {
+            // For negative numbers, convert to 8-bit two's complement
+            return ((1 << 8) + num).toString(2).slice(-8);
         }
-     
-
-
-
     }
 
+    loadBlockIntoCache(address) {
+        const blockAddress = this.getBlockAddress(address);
+        
+        // Ensure the cache block exists
+        if (!this.Cache[blockAddress]) {
+            this.Cache[blockAddress] = new Array(this.blockSize).fill(null);
+        }
+    
+        // Load entire block from memory
+        const blockData = [];
+        for (let i = 0; i < this.blockSize; i++) {
+            const memoryAddress = blockAddress * this.blockSize + i;
+            // Ensure memory address is within bounds
+            const byteValue = memoryAddress < this.memory.length ? 
+                this.memory[memoryAddress] : 
+                null;
+            blockData.push(byteValue);
+        }
+    
+        // Store the block in the cache
+        this.Cache[blockAddress] = blockData;
+        
+        console.log(`Loaded block from memory address ${blockAddress} into cache`);
     }
-    // cacheSet(address, value) {
-    //     this.cache[address] = value;
-    // }
 
-
-
+    cacheGet(instruction, address, value = null) {
+        // Determine the number of bytes and operation type
+        const bytesToCheck = instruction.type === "LW" || instruction.type === "L.w" ? 4 : 
+                             instruction.type === "LD" || instruction.type === "L.D" ? 8 : 
+                             instruction.type === "SW" || instruction.type === "S.w" ? 4 :
+                             instruction.type === "SD" || instruction.type === "S.D" ? 8 : 
+                             1; // default to 1 byte if unknown instruction
+    
+        // Determine if it's a load or store operation
+        const isLoadOperation = instruction.type.startsWith('L');
+        const isStoreOperation = instruction.type.startsWith('S');
+    
+        // Calculate the block address and starting index
+        const blockAddress = this.getBlockAddress(address);
+        const startIndex = this.getIndex(address);
+    
+        // Handle store operations first
+        if (isStoreOperation) {
+            // Convert value to bytes
+            const bytes = this.convertValueToBytes(value, bytesToCheck);
+            
+            // Store in cache
+            for (let i = 0; i < bytesToCheck; i++) {
+                const currentAddress = address + i;
+                const currentBlockAddress = this.getBlockAddress(currentAddress);
+                const currentIndex = this.getIndex(currentAddress);
+    
+                // Ensure the block exists
+                if (!this.Cache[currentBlockAddress]) {
+                    this.Cache[currentBlockAddress] = new Array(this.blockSize).fill(null);
+                }
+    
+                // Store byte in cache
+                this.Cache[currentBlockAddress][currentIndex] = bytes[i];
+    
+                // Store byte in memory
+                this.Insertintomemory(currentAddress + 1, bytes[i]);
+            }
+    
+            return {
+                data: value,
+                isHit: true,
+                penalty: this.hitLatency
+            };
+        }
+    
+        // Handle load operations
+        // Check if all required bytes exist in the cache
+        let allBytesInCache = true;
+        for (let i = 0; i < bytesToCheck; i++) {
+            const currentAddress = address + i;
+            const currentBlockAddress = this.getBlockAddress(currentAddress);
+            const currentIndex = this.getIndex(currentAddress);
+    
+            // Ensure the block exists and the specific index is not null
+            if (!this.Cache[currentBlockAddress] || 
+                this.Cache[currentBlockAddress][currentIndex] === null) {
+                allBytesInCache = false;
+                break;
+            }
+        }
+    
+        // Handle cache hit or miss for load operations
+        if (allBytesInCache) {
+            // Cache hit: Increment hits and return the data
+            this.hits++;
+            this.accessCount++;
+            
+            // Collect the bytes from cache and convert to integer
+            let intValue = 0n; // Use BigInt to handle larger values
+            for (let i = 0; i < bytesToCheck; i++) {
+                const currentAddress = address + i;
+                const currentBlockAddress = this.getBlockAddress(currentAddress);
+                const currentIndex = this.getIndex(currentAddress);
+                
+                // Reconstruct integer by shifting and adding bytes
+                // Assumes big-endian representation
+                intValue = (intValue << 8n) | BigInt(this.Cache[currentBlockAddress][currentIndex]);
+            }
+    
+            return {
+                data: intValue,
+                isHit: true,
+                penalty: this.hitLatency
+            };
+        } else {
+            // Cache miss: Load the entire block from memory
+            this.misses++;
+            this.accessCount++;
+    
+            // Load the block containing the address into cache
+            this.loadBlockIntoCache(address);
+    
+            // Return miss information
+            return {
+                data: null,
+                isHit: false,
+                penalty: this.missPenalty
+            };
+        }
+    }
+    // Helper method to convert value to bytes
+    convertValueToBytes(value, numBytes) {
+        const bytes = [];
+        let remainingValue = BigInt(value);
+    
+        // Convert to bytes in big-endian order
+        for (let i = 0; i < numBytes; i++) {
+            // Extract the least significant byte
+            const byte = Number(remainingValue & 0xFFn);
+            bytes.unshift(byte); // Prepend to maintain big-endian order
+            
+            // Shift right by 8 bits
+            remainingValue >>= 8n;
+        }
+    
+        return bytes;
+    }
+ 
 
 }
 
-//     // Modified to handle word-aligned addresses
-//     getWordAddress(byteAddress) {
-//         return Math.floor(byteAddress / 4) * 4;
-//     }
-
-//     // Modified to handle block-aligned addresses
-//     getBlockAddress(byteAddress) {
-//         return Math.floor(byteAddress / this.blockSize) * this.blockSize;
-//     }
-
-//     // Get block index from address
-//     getIndex(address) {
-//         return Math.floor((address / this.blockSize) % this.numBlocks);
-//     }
-
-//     // Get tag from address
-//     getTag(address) {
-//         return Math.floor(address / (this.blockSize * this.numBlocks));
-//     }
-
-//     // New method to read a word (4 bytes)
-//     readWord(address) {
-//         const wordAddress = this.getWordAddress(address);
-//         const result = this.access(wordAddress, 4, false);
-//         return {
-//             data: result.data,
-//             cycles: result.cycles,
-//             hit: result.hit
-//         };
-//     }
-
-//     // New method to read a double word (8 bytes)
-//     readDouble(address) {
-//         const wordAddress = this.getWordAddress(address);
-//         const result = this.access(wordAddress, 8, false);
-//         return {
-//             data: result.data,
-//             cycles: result.cycles,
-//             hit: result.hit
-//         };
-//     }
-
-//     // Modified access method to handle different sizes and write operations
-//     access(address, size = 4, isWrite = false) {
-//         this.accessCount++;
-//         const index = this.getIndex(address);
-//         const tag = this.getTag(address);
-//         const block = this.blocks[index];
-//         const blockOffset = address % this.blockSize;
-
-//         // Cache hit
-//         if (block.valid && block.tag === tag) {
-//             this.hits++;
-//             block.lastUsed = this.accessCount;
-            
-//             const data = block.data.slice(blockOffset, blockOffset + size);
-//             if (isWrite) {
-//                 block.dirty = true;
-//             }
-            
-//             return {
-//                 hit: true,
-//                 cycles: this.hitLatency,
-//                 data: data
-//             };
-//         }
-
-//         // Cache miss
-//         this.misses++;
-        
-//         // Handle dirty block eviction if necessary
-//         if (block.valid && block.dirty) {
-//             this.writeBackToMemory(block);
-//         }
-        
-//         // Load new block from memory
-//         const blockAddress = this.getBlockAddress(address);
-//         this.blocks[index] = {
-//             valid: true,
-//             tag: tag,
-//             data: this.loadFromMemory(blockAddress, this.blockSize),
-//             lastUsed: this.accessCount,
-//             dirty: isWrite,
-//             blockAddress: blockAddress
-//         };
-
-//         const data = this.blocks[index].data.slice(blockOffset, blockOffset + size);
-        
-//         return {
-//             hit: false,
-//             cycles: this.missPenalty,
-//             data: data
-//         };
-//     }
-
-//     // New method to simulate writing back to memory
-//     writeBackToMemory(block) {
-//         console.log(`Writing back block at address ${block.blockAddress} to memory`);
-//         // In a real implementation, this would write to main memory
-//     }
-
-//     // Modified to simulate more realistic memory access
-//     loadFromMemory(address, size) {
-//         console.log(`Loading ${size} bytes from memory address ${address}`);
-//         // Simulate memory access delay
-//         return new Array(size).fill(0).map((_, i) => {
-//             // Simulate some pattern based on address for debugging
-//             return (address + i) % 256;
-//         });
-//     }
-
-//     // Enhanced statistics
-//     getStats() {
-//         return {
-//             hits: this.hits,
-//             misses: this.misses,
-//             hitRate: this.hits / (this.hits + this.misses || 1),
-//             totalAccesses: this.accessCount,
-//             missRate: this.misses / (this.hits + this.misses || 1)
-//         };
-//     }
-
-//     // Modified clear method to reset all state
-//     clear() {
-//         this.blocks.forEach(block => {
-//             block.valid = false;
-//             block.tag = null;
-//             block.data.fill(0);
-//             block.lastUsed = 0;
-//             block.dirty = false;
-//             block.blockAddress = null;
-//         });
-//         this.hits = 0;
-//         this.misses = 0;
-//         this.accessCount = 0;
-//     }
-// }
+ 
         
 function main() {
-    // Create a cache with:
-    // - 64-byte blocks
-    // - 1024-byte (1KB) total cache size
-    // - 1 cycle hit latency
-    // - 10 cycles miss penalty
+
     const cache = new Cache(64, 128, 1, 10);
     // cache.getBlockAddress(100);
     // cache.getIndex(100);
@@ -236,72 +219,130 @@ function main() {
     // cache.initCache();
     // console.log(cache);
 
-// 8-bit representation example
-function toBinary8Bit(num) {
-    if (num >= 0) {
-        return num.toString(2).padStart(8, '0');
-    } else {
-        // For negative numbers, convert to 8-bit two's complement
-        return ((1 << 8) + num).toString(2).slice(-8);
+// 8-bit representation exampl
+const pos = cache.toBinary8Bit(42);
+const neg = cache.toBinary8Bit(-42);
+console.log(pos);   
+console.log(neg);  
+   
+}
+
+// Create a cache instance
+const blockSize = 8;  // 8 bytes per block
+const cacheSize = 64; // 64 bytes total cache size
+const cache = new Cache(blockSize, cacheSize);
+
+// Populate memory with some test data
+function populateMemory() {
+    // Fill memory with some sample byte values
+    for (let i = 0; i < 100; i++) {
+        cache.Insertintomemory(i, i % 256);  // Insert byte values 0-255 cycling
     }
 }
 
-console.log(toBinary8Bit(42));    // "00101010"
-console.log(toBinary8Bit(-42));   // "11010110"
-    // console.log("Cache Configuration:");
-    // console.log(`Block Size: ${cache.blockSize} bytes`);
-    // console.log(`Cache Size: ${cache.cacheSize} bytes`);
-    // console.log(`Number of Blocks: ${cache.numBlocks}`);
-    // console.log("\n");
+// Test function to simulate cache access
+function testCacheAccess() {
+    // Populate memory first
+    populateMemory();
 
-    // // Perform some example operations
-    // console.log("Performing cache operations:");
-    
-    // // Read some words from different addresses
-    // console.log("\n1. Reading word from address 0:");
-    // let result1 = cache.readWord(0);
-    // console.log("Result:", result1);
+    // Test scenarios
+    const testCases = [
+        // Load Operations
+        { 
+            description: "First LW Load (Cache Miss)",
+            instruction: { type: "LW" }, 
+            address: 0 
+        },
+        { 
+            description: "Second LW Load (Cache Hit)",
+            instruction: { type: "LW" }, 
+            address: 0 
+        },
+        { 
+            description: "LD Load (Cache Miss)",
+            instruction: { type: "LD" }, 
+            address: 16 
+        },
+        { 
+            description: "L.w Load (Cache Miss)",
+            instruction: { type: "L.w" }, 
+            address: 32 
+        },
+        { 
+            description: "Accessing Boundary (Cache Miss)",
+            instruction: { type: "LW" }, 
+            address: 63 // Edge of cache
+        },
+        { 
+            description: "Accessing Out of Bounds (Cache Miss)",
+            instruction: { type: "LW" }, 
+            address: 100 // Beyond cache size
+        },
+        { 
+            description: "SW Store Operation",
+            instruction: { type: "SW" }, 
+            address: 64,
+            value: 0x12345678 
+        },
+        { 
+            description: "SD Store Operation",
+            instruction: { type: "SD" }, 
+            address: 80,
+            value: 0x1122334455667788n 
+        },
+        { 
+            description: "Load from Empty Cache (Cache Miss)",
+            instruction: { type: "LW" }, 
+            address: 128 // Address not populated
+        },
+        { 
+            description: "Load with Different Data Type (Cache Miss)",
+            instruction: { type: "LD" }, 
+            address: 8 
+        },
+        { 
+            description: "Load with Invalid Address (Cache Miss)",
+            instruction: { type: "LW" }, 
+            address: -1 // Invalid address
+        }
+    ];
 
-    // console.log("\n2. Reading word from address 4:");
-    // let result2 = cache.readWord(4);
-    // console.log("Result:", result2);
+    // Track total penalty
+    let totalPenalty = 0;
 
-    // console.log("\n3. Reading double from address 8:");
-    // let result3 = cache.readDouble(8);
-    // console.log("Result:", result3);
+    // Run tests
+    testCases.forEach((testCase, index) => {
+        console.log(`\nTest Case ${index + 1}: ${testCase.description}`);
+        
+        // Prepare the call parameters
+        const params = testCase.value !== undefined 
+            ? [testCase.instruction, testCase.address, testCase.value]
+            : [testCase.instruction, testCase.address];
 
-    // // Read from same address again to demonstrate cache hit
-    // console.log("\n4. Reading word from address 0 again (should be a hit):");
-    // let result4 = cache.readWord(0);
-    // console.log("Result:", result4);
+        try {
+            // Perform cache access
+            const result = cache.cacheGet(...params);
+            
+            // Log detailed results
+            console.log("Result:", result);
+            console.log(`Block Address: ${cache.getBlockAddress(testCase.address)}`);
+            console.log(`Index in Block: ${cache.getIndex(testCase.address)}`);
+            
+            // Accumulate penalty
+            totalPenalty += result.penalty;
+        } catch (error) {
+            console.error("Error in test case:", error);
+        }
+    });
 
-    // // Read from an address in a different cache block
-    // console.log("\n5. Reading word from address 128 (should be a miss):");
-    // let result5 = cache.readWord(128);
-    // console.log("Result:", result5);
-
-    // // Print cache statistics
-    // console.log("\nCache Statistics:");
-    // const stats = cache.getStats();
-    // console.log(`Hit Rate: ${(stats.hitRate * 100).toFixed(2)}%`);
-    // console.log(`Miss Rate: ${(stats.missRate * 100).toFixed(2)}%`);
-    // console.log(`Total Accesses: ${stats.totalAccesses}`);
-    // console.log(`Hits: ${stats.hits}`);
-    // console.log(`Misses: ${stats.misses}`);
+    // Print cache statistics
+    console.log("\nCache Statistics:");
+    console.log(`Total Accesses: ${cache.accessCount}`);
+    console.log(`Hits: ${cache.hits}`);
+    console.log(`Misses: ${cache.misses}`);
+    console.log(`Hit Ratio: ${(cache.hits / cache.accessCount * 100).toFixed(2)}%`);
+    console.log(`Total Penalty: ${totalPenalty}`);
 }
 
-// Run the main function
-main();
-// 1024
-
-// LD r1, 100 ->103
-
-// blockSize = 4
-
-//  1 2 3 4 5
-// [0,1,2,3,4]
- 
-// ld r1, 100
-
-// for (int i = 0; i < 4; i++) {
-//     cache.access(100 + i, 4, false); }
+// Run the test
+testCacheAccess();
