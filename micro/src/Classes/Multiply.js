@@ -1,7 +1,3 @@
-
-
-
-// Multiplication Reservation Station
 class MultiplicationReservationStation {
     constructor(tag, busy, operation, Vi, Vj, Qi, Qj, A, time) {
         this.tag = tag;
@@ -119,10 +115,53 @@ class MultiplicationReservationStation {
 }
 function main() {
     console.log("Hello World");
-    const multiply = new MultiplicationReservationStation(1, true, "MUL.D", 1, 2, null, null, null, 0);
-    multiply.execute();
-    console.log(multiply.broadcast());
+    const multiply = new MultiplicationReservationStation(1, true, "MUL.D", null, null, "Q1", "Q2", null, 5);
+
+    // Simulate the resolution of dependencies
+    setTimeout(() => {
+        multiply.updateQ("Q1", 10);
+        multiply.updateQ("Q2", 2);
+    }, 2000);
+
+    const interval = setInterval(() => {
+        console.log(`Clock cycle: ${5 - multiply.time}`);
+        console.log(`Station state:`, {
+            tag: multiply.tag,
+            busy: multiply.busy,
+            operation: multiply.operation,
+            Vi: multiply.Vi,
+            Vj: multiply.Vj,
+            Qi: multiply.Qi,
+            Qj: multiply.Qj,
+            A: multiply.A,
+            time: multiply.time,
+            result: multiply.result,
+            operationPerformed: multiply.operationPerformed
+        });
+
+        multiply.execute();
+        
+        if (!multiply.isExecuting()) {
+            clearInterval(interval);
+            console.log(multiply.broadcast());
+            multiply.clear();
+            console.log(`Station state after complete:`, {
+                tag: multiply.tag,
+                busy: multiply.busy,
+                operation: multiply.operation,
+                Vi: multiply.Vi,
+                Vj: multiply.Vj,
+                Qi: multiply.Qi,
+                Qj: multiply.Qj,
+                A: multiply.A,
+                time: multiply.time,
+                result: multiply.result,
+                operationPerformed: multiply.operationPerformed
+            });
+        }
+    }, 1000);
 }
+
 main();
-export default MultiplicationReservationStation;
+module.exports =  MultiplicationReservationStation;
 
