@@ -205,28 +205,30 @@ class Processor {
 
         // Execute store buffers first if they're ready
         this.storeBuffers.forEach(buffer => {
-            if (buffer.busy && buffer.Q === null && buffer.time > 0) {
-                // Store is ready to execute (its value is available)
-                buffer.time--;
-                executingStations.push({
-                    operation: buffer.operation,
-                    tag: buffer.tag,
-                    time: buffer.time
-                });
-                
-                if (buffer.time === 0) {
-                    this.cache.Insertintomemory(buffer.address, buffer.value);
-                    this.busyPublishers.push(buffer);
-                    console.log(`Store completed: Writing ${buffer.value} to address ${buffer.address}`);
+            if (buffer.busy) {
+                if (buffer.Q === null) {
+                    // Store is ready to execute (its value is available)
+                    buffer.time--;
+                    executingStations.push({
+                        operation: buffer.operation,
+                        tag: buffer.tag,
+                        time: buffer.time
+                    });
+                    
+                    if (buffer.time === 0) {
+                        this.cache.Insertintomemory(buffer.address, buffer.value);
+                        this.busyPublishers.push(buffer);
+                        console.log(`Store completed: Writing ${buffer.value} to address ${buffer.address}`);
+                    }
+                } else {
+                    console.log(`Store ${buffer.tag} waiting for ${buffer.Q}`);
                 }
-            } else if (buffer.busy && buffer.Q !== null) {
-                console.log(`Store ${buffer.tag} waiting for ${buffer.Q}`);
             }
         });
 
         // Only execute computational instructions if there are no executing stores
         const hasExecutingStore = this.storeBuffers.some(buffer => 
-            buffer.busy && buffer.Q === null && buffer.time > 0
+            buffer.busy && buffer.Q === null && buffer.time >= 0
         );
 
         if (!hasExecutingStore) {
@@ -260,6 +262,7 @@ class Processor {
 
         const publisher = this.busyPublishers.shift();
         let result;
+        const executingStations = [];
 
         if (publisher.tag.startsWith('STORE')) {
             result = publisher.value;
@@ -285,19 +288,32 @@ class Processor {
             // For computational units (ADD, MUL, LOAD)
             result = publisher.broadcast();
             
-            // Update store buffers
+            // Update store buffers and track if result will be stored
+            let resultWillBeStored = false;
             this.storeBuffers.forEach(buffer => {
                 if (buffer.busy && buffer.Q === publisher.tag) {
                     buffer.value = result;
                     buffer.Q = null;
+                    buffer.time--;  // Decrement time immediately
+                    resultWillBeStored = true;
                     console.log(`Updated store buffer with value ${result}`);
+                    console.log(`Store starting execution, time remaining: ${buffer.time}`);
                 }
             });
 
             // Update Add and Mul stations
             [...this.addStations, ...this.mulStations].forEach(station => {
                 if (station.busy) {
-                    station.updateQ(publisher.tag, result);
+                    if (station.Qi === publisher.tag && resultWillBeStored) {
+                        station.Qi = 'STORE0';  // Set dependency to store
+                    } else if (station.Qi === publisher.tag) {
+                        station.updateQ(publisher.tag, result);
+                    }
+                    if (station.Qj === publisher.tag && resultWillBeStored) {
+                        station.Qj = 'STORE0';  // Set dependency to store
+                    } else if (station.Qj === publisher.tag) {
+                        station.updateQ(publisher.tag, result);
+                    }
                 }
             });
 
