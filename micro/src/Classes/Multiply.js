@@ -22,39 +22,37 @@ class MultiplicationReservationStation {
     execute() {
         if (!this.busy || this.time <= 0) return;
 
-        // Wait until all dependencies are resolved
-        if (this.Qi !== null || this.Qj !== null) {
-            console.log(`Station ${this.tag} waiting on dependencies Qi: ${this.Qi}, Qj: ${this.Qj}`);
-            return;
-        }
-
-        // Perform the operation only once
         if (!this.operationPerformed) {
             this.validateOperation();
+
+            // Convert operands to numbers
+            const vi = Number(this.Vi);
+            const vj = Number(this.Vj);
 
             switch (this.operation) {
                 case "MUL.D":
                 case "MUL.S":
-                    this.result = this.Vi * this.Vj;
+                    this.result = vi * vj;
                     break;
                 case "DIV.D":
                 case "DIV.S":
-                    if (this.Vj === 0) {
+                    if (vj === 0) {
                         console.error(`Division by zero in station ${this.tag}!`);
-                        this.result = null; // Handle division by zero
+                        this.result = null;
                     } else {
-                        this.result = this.Vi / this.Vj;
+                        this.result = vi / vj;
                     }
                     break;
                 default:
                     console.error(`Unsupported operation: ${this.operation} in station ${this.tag}`);
             }
 
-            this.operationPerformed = true; 
+            this.operationPerformed = true;
+            console.log(`${this.tag} performed ${this.operation}: ${vi} ${this.operation.includes('MUL') ? '*' : '/'} ${vj} = ${this.result}`);
         }
 
         if (this.time > 0) {
-            this.time -= 1;
+            this.time--;
         }
     }
 

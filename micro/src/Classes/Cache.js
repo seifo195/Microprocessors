@@ -30,7 +30,7 @@ class Cache {
     loadBlockIntoCache(address) {
         const blockAddress = this.getBlockAddress(address); // Get the block address
         const blockData = this.loadFromMemory(blockAddress, this.blockSize); // Load data from memory
-        const index = this.getIndex(blockAddress); // Get the index in the cache
+        const index = this.getIndex(address); // Get the index in the cache
 
         // Store the loaded block in the cache
         this.cache[index] = blockData;
@@ -249,6 +249,18 @@ class Cache {
         return bytes;
     }
  
+    getMemoryValue(address) {
+        // Adjust address to be 0-based since memory is 0-indexed
+        const adjustedAddress = address - 1;
+        
+        // Check if address is valid
+        if (adjustedAddress < 0 || adjustedAddress >= this.memory.length) {
+            console.warn(`Address ${address} is out of bounds`);
+            return null;
+        }
+
+        return this.memory[adjustedAddress];
+    }
 
 }
 
@@ -392,4 +404,5 @@ function testCacheAccess() {
 }
 
 // Run the test
-testCacheAccess();
+// testCacheAccess();
+module.exports = Cache;
