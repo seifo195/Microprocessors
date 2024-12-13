@@ -266,7 +266,7 @@ function App() {
       <div className="simulator-layout">
         {/* Top row */}
         <div className="top-row">
-          <InstructionQueue />
+          <InstructionQueue instructions={parsedInstructions} />
           <Regfile />
         </div>
         
@@ -283,10 +283,6 @@ function App() {
         </div>
       </div>
 
-      <div style={{margin: '20px', textAlign: 'left'}}>
-        <h3>Parsed Instructions:</h3>
-        <pre>{JSON.stringify(parsedInstructions, null, 2)}</pre>
-      </div>
       <Cache cacheSize={cacheConfig.cacheSize} blockSize={cacheConfig.blockSize} />
     </div>
     

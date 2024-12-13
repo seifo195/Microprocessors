@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 
-function InstructionQeueu() {
-    const [instructions, setInstructions] = useState([]);
-
+function InstructionQeueu({ instructions }) {
+    const [latencies, setLatencies] = useState({});
+    
     const options = [
         // Integer ALU operations
         'DADDI',
@@ -61,30 +61,33 @@ function InstructionQeueu() {
                 </tbody>
             </table>
 
+            {/* Instructions table updated to match parsed instruction fields */}
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
                 <thead>
                     <tr>
-                        <th style={{ border: '1px solid black', padding: '8px' }}>Instruction</th>
-                        <th style={{ border: '1px solid black', padding: '8px' }}>Latency</th>
-                        <th style={{ border: '1px solid black', padding: '8px' }}>destination</th>
-                        <th style={{ border: '1px solid black', padding: '8px' }}>J</th>
-                        <th style={{ border: '1px solid black', padding: '8px' }}>K</th>
+                        <th style={{ border: '1px solid black', padding: '8px' }}>Label</th>
+                        <th style={{ border: '1px solid black', padding: '8px' }}>Operation</th>
+                        <th style={{ border: '1px solid black', padding: '8px' }}>Rd</th>
+                        <th style={{ border: '1px solid black', padding: '8px' }}>Rs</th>
+                        <th style={{ border: '1px solid black', padding: '8px' }}>Rt</th>
+                        <th style={{ border: '1px solid black', padding: '8px' }}>Immediate</th>
                         <th style={{ border: '1px solid black', padding: '8px' }}>Issue</th>
-                        <th style={{ border: '1px solid black', padding: '8px' }}>Execution</th>
+                        <th style={{ border: '1px solid black', padding: '8px' }}>Execute</th>
                         <th style={{ border: '1px solid black', padding: '8px' }}>Write Result</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {instructions.map((inst, index) => (
+                    {instructions && instructions.map((inst, index) => (
                         <tr key={index}>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.instruction}</td>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.latency}</td>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.destination}</td>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.j}</td>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.k}</td>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.issue}</td>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.execution}</td>
-                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.writeResult}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.label || '-'}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.opcode}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.rd || '-'}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.rs || '-'}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.rt || '-'}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.immediate || '-'}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.issue || '-'}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.execution || '-'}</td>
+                            <td style={{ border: '1px solid black', padding: '8px' }}>{inst.writeResult || '-'}</td>
                         </tr>
                     ))}
                 </tbody>
