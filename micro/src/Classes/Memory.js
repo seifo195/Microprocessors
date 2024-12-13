@@ -12,4 +12,4 @@ function main() {
     console.log(memory);
 }
 main();
-export default Memory;
+module.exports =  Memory;
