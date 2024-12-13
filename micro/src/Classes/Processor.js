@@ -264,10 +264,11 @@ class Processor {
         availableBuffer.op = instruction.type;
         availableBuffer.address = instruction.address;
         availableBuffer.tag = `LD${this.loadBuffers.indexOf(availableBuffer)}`;
-        availableBuffer.time = 3;  // Fixed 3-cycle latency
+        availableBuffer.time = 3;  // Set load latency to 3 cycles
         
         console.log(`Issued load instruction to ${availableBuffer.tag}`);
 
+        // Update register status
         if (instruction.dest) {
             this.registerStatus[instruction.dest] = availableBuffer.tag;
             console.log(`Register ${instruction.dest} now waiting for ${availableBuffer.tag}`);
@@ -580,8 +581,8 @@ function main() {
 
     // Create test instructions
     const instructions = [
-        { type: 'L.D', dest: 'F6', address: 100 },
         { type: 'ADD.D', dest: 'F8', src1: 'F6', src2: 'F2' },
+        { type: 'L.D', dest: 'F8', address: 100 },
         { type: 'MUL.D', dest: 'F10', src1: 'F8', src2: 'F6' }
     ];
 
