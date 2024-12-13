@@ -291,7 +291,7 @@ console.log(toBinary8Bit(-42));   // "11010110"
 }
 
 // Run the main function
-main();
+// main();
 // 1024
 
 // LD r1, 100 ->103
@@ -305,3 +305,4 @@ main();
 
 // for (int i = 0; i < 4; i++) {
 //     cache.access(100 + i, 4, false); }
+module.exports = Cache;
