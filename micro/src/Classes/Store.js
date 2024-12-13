@@ -11,6 +11,12 @@ class StoreReservationStation {
         this.cache = cache; // Reference to cache instance
     }
 
+    validateOperation() {
+        if (!["SW", "SD", "S.S", "S.D"].includes(this.op)) {
+            throw new Error(`Invalid operation ${this.op} in station ${this.tag}`);
+        }
+    }
+
     execute() {
         if (!this.busy || this.time < 0) return;
 
@@ -26,6 +32,7 @@ class StoreReservationStation {
 
         // Perform the store operation only after all cycles are completed
         if (this.time === 0 && !this.operationPerformed) {
+            this.validateOperation();
             const { isHit, penalty } = this.cache.cacheGet(this.op, this.address, this.Vi);
 
             if (!isHit) {

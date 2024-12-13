@@ -11,6 +11,12 @@ class LoadReservationStation {
         this.cache = cache; // Reference to cache instance
     }
 
+    validateOperation() {
+        if (!["LW", "LD", "L.S", "L.D"].includes(this.op)) {
+            throw new Error(`Invalid operation ${this.op} in station ${this.tag}`);
+        }
+    }
+
     execute() {
         if (!this.busy || this.time <= 0) return;
 
@@ -21,6 +27,7 @@ class LoadReservationStation {
         }
 
         if (!this.operationPerformed) {
+            this.validateOperation();
             // Fetch data from the cache using cacheGet
             const { data, isHit, penalty } = this.cache.cacheGet({ type: this.op }, this.address);
 
