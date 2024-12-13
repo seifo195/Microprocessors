@@ -1,36 +1,41 @@
 import React from 'react';
-import './InstructionQueue.css';
 
-function InstructionQueue({ instructions }) {
+function InstructionQueue({ instructions, latencies }) {
   return (
-    <div className="instruction-queue">
+    <div>
       <h2>Instruction Queue</h2>
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Instruction</th>
-              <th>Issue</th>
-              <th>Execute Start</th>
-              <th>Execute End</th>
-              <th>Write Result</th>
+      <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: '20px' }}>
+        <thead>
+          <tr>
+            <th style={{ border: '1px solid black', padding: '8px' }}>Instruction</th>
+            <th style={{ border: '1px solid black', padding: '8px' }}>Status</th>
+            <th style={{ border: '1px solid black', padding: '8px' }}>Issue</th>
+            <th style={{ border: '1px solid black', padding: '8px' }}>Execute</th>
+            <th style={{ border: '1px solid black', padding: '8px' }}>Write Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {instructions.map((inst, index) => (
+            <tr key={index}>
+              <td style={{ border: '1px solid black', padding: '8px' }}>
+                {`${inst.type} ${inst.dest || ''} ${inst.src1 || ''} ${inst.src2 || ''}`}
+              </td>
+              <td style={{ border: '1px solid black', padding: '8px' }}>
+                {inst.status || 'Waiting'}
+              </td>
+              <td style={{ border: '1px solid black', padding: '8px' }}>
+                {inst.issueTime || '-'}
+              </td>
+              <td style={{ border: '1px solid black', padding: '8px' }}>
+                {inst.executeTime || '-'}
+              </td>
+              <td style={{ border: '1px solid black', padding: '8px' }}>
+                {inst.writeTime || '-'}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {instructions.map((inst, index) => (
-              <tr key={index}>
-                <td>
-                  {`${inst.type} ${inst.dest || ''} ${inst.src1 || ''} ${inst.src2 || ''}`}
-                </td>
-                <td>{inst.issueCycle || '-'}</td>
-                <td>{inst.executeStartCycle || '-'}</td>
-                <td>{inst.executeEndCycle || '-'}</td>
-                <td>{inst.writeResultCycle || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
