@@ -6,6 +6,7 @@ import InstructionQueue from './Components/instructionqeueu.js';
 import Load from './Components/Load.js';
 import Store from './Components/Store.js'; 
 import Cache from './Components/Cache.js';
+import InstructionStatus from './Components/InstructionStatus';
 import { useState } from 'react';
 import { Processor } from './Classes/Processor.js';
 import { parseInstruction } from './instructionParser.js';
@@ -45,7 +46,7 @@ function App() {
         const text = e.target.result;
         const instructions = text
           .split('\n')
-          .filter(line => line.trim() !== '')
+          .filter(line => line.trim() !== '') // Remove empty lines
           .map(line => {
             const parsedInstruction = parseInstruction(line.trim());
             // Convert parsed instruction to processor format
@@ -404,6 +405,10 @@ function App() {
           <div className="processor-state">
             <InstructionQueue 
               instructions={processorState?.instructionQueue || []}
+            />
+            
+            <InstructionStatus 
+              instructions={processorState?.instructionStatus || []}
             />
             
             <div className="stations-container">

@@ -11,35 +11,27 @@ const StoreReservationStation = require('./Store');
 class Processor {
     constructor(config) {
         this.config = {
-            addStations: config.addStations || 3,
-            mulStations: config.mulStations || 2,
-            loadBuffers: config.loadBuffers || 3,
-            storeBuffers: config.storeBuffers || 3,
+            addStations: 3,
+            mulStations: 2,
+            loadBuffers: 3,
+            storeBuffers: 3,
             intRegisters: 32,
             fpRegisters: 32,
-            cacheSize: config.cacheSize || 128,
-            blockSize: config.blockSize || 16,
-            latencies: config.latencies || {
+            cacheSize: 1024,
+            blockSize: 64,
+            latencies: {
                 'ADD.D': 2,
                 'SUB.D': 2,
+                'MUL.D': 10,
+                'DIV.D': 40,
+                'L.D': 2,
+                'S.D': 2,
                 'ADD.S': 2,
                 'SUB.S': 2,
-                'MUL.D': 10,
-                'MUL.S': 6,
-                'DIV.D': 40,
-                'DIV.S': 24,
-                'L.D': 2,
+                'MUL.S': 10,
+                'DIV.S': 40,
                 'L.S': 2,
-                'S.D': 2,
-                'S.S': 2,
-                'ADDI': 1,
-                'SUBI': 1,
-                'DADDI': 1,
-                'DSUBI': 1,
-                'LW': 2,
-                'SW': 2,
-                'LD': 2,
-                'SD': 2
+                'S.S': 2
             },
             ...config
         };
@@ -636,34 +628,22 @@ class Processor {
         availableBuffer.busy = true;
         availableBuffer.operation = instruction.type;
         availableBuffer.address = instruction.address;
-        availableBuffer.src = instruction.src;
+        availableBuffer.src = instruction.src;  // Save source register for dependency checking
+        availableBuffer.time = this.getOperationLatency(instruction.type);
 
-        // Check if the source register is waiting for a result
+        // Check if source register is waiting for a result
         const srcStatus = this.registerStatus[instruction.src];
         if (srcStatus) {
             console.log(`Store waiting for ${srcStatus} to compute ${instruction.src}`);
             availableBuffer.Q = srcStatus;
             availableBuffer.value = null;
         } else {
-            // Even if no dependency, check if any previous instruction will write to this register
-            const willBeWritten = [...this.addStations, ...this.mulStations, ...this.loadBuffers].some(station => 
-                station.busy && station.dest === instruction.src
-            );
-            
-            if (willBeWritten) {
-                console.log(`RAW hazard: ${instruction.src} will be written by a previous instruction`);
-                availableBuffer.Q = "pending";
-                availableBuffer.value = null;
-            } else {
-                availableBuffer.Q = null;
-                availableBuffer.value = this.getRegisterValue(instruction.src).value;
-            }
+            availableBuffer.Q = null;
+            availableBuffer.value = this.getRegisterValue(instruction.src).value;
         }
 
-        availableBuffer.time = this.getLatency(instruction.type);
         return availableBuffer;
     }
-
     getLatency(operation) {
         return this.config.latencies[operation] || 1;
     }
@@ -823,31 +803,7 @@ class Processor {
     }
 
     getOperationLatency(operation) {
-        // Default latencies for different operation types
-        const latencies = {
-            'ADD.D': 2,
-            'SUB.D': 2,
-            'ADD.S': 2,
-            'SUB.S': 2,
-            'MUL.D': 6,
-            'MUL.S': 6,
-            'DIV.D': 10,
-            'DIV.S': 10,
-            'L.D': 2,
-            'L.S': 2,
-            'S.D': 2,
-            'S.S': 2,
-            'ADDI': 1,
-            'SUBI': 1,
-            'DADDI': 1,
-            'DSUBI': 1,
-            'LW': 2,
-            'SW': 2,
-            'LD': 2,
-            'SD': 2
-        };
-
-        return latencies[operation] || 1; // Return 1 cycle as default if operation not found
+        return this.config.latencies[operation] || 1;
     }
 }
 
