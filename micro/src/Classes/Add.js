@@ -1,5 +1,3 @@
-
-// Addition Reservation Station
 class AdditionReservationStation {
     constructor(tag, busy, operation, Vi, Vj, Qi, Qj, A, time) {
         this.tag = tag;
@@ -107,9 +105,50 @@ class AdditionReservationStation {
 
 function main() {
     console.log("Hello World");
-    const add = new AdditionReservationStation(1, true, "ADD.D", 1, 2, null, null, null, 0);
-    add.execute();
-    console.log(add.broadcast());
+    const add = new AdditionReservationStation(1, true, "ADD.D", null, null, "Q1", "Q2", null, 5);
+
+    // Simulate the resolution of dependencies
+    setTimeout(() => {
+        add.updateQ("Q1", 10);
+        add.updateQ("Q2", 2);
+    }, 2000);
+
+    const interval = setInterval(() => {
+        console.log(`Clock cycle: ${5 - add.time}`);
+        console.log(`Station state:`, {
+            tag: add.tag,
+            busy: add.busy,
+            operation: add.operation,
+            Vi: add.Vi,
+            Vj: add.Vj,
+            Qi: add.Qi,
+            Qj: add.Qj,
+            A: add.A,
+            time: add.time,
+            result: add.result,
+            operationPerformed: add.operationPerformed
+        });
+
+        add.execute();
+        
+        if (!add.isExecuting()) {
+            clearInterval(interval);
+            console.log(add.broadcast());
+            add.clear();
+            console.log(`Station state after complete:`, {
+                tag: add.tag,
+                busy: add.busy,
+                operation: add.operation,
+                Vi: add.Vi,
+                Vj: add.Vj,
+                Qi: add.Qi,
+                Qj: add.Qj,
+                A: add.A,
+                time: add.time,
+                result: add.result,
+                operationPerformed: add.operationPerformed
+            });        }
+    }, 1000);
 }
 main();
-export default AdditionReservationStation;  
+module.exports = AdditionReservationStation;
