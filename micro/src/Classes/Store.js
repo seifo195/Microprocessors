@@ -10,7 +10,7 @@ class StoreReservationStation {
     }
 
     execute(memory) {
-        if (!this.busy || this.time <= 0) return;
+        if (!this.busy || this.time < 0) return;
 
         if (this.Qi !== null) {
             console.log(`Store Station ${this.tag} waiting on dependency Qi: ${this.Qi}`);
@@ -25,7 +25,7 @@ class StoreReservationStation {
         if (this.time === 0 && !this.operationPerformed) {
             memory[this.address] = this.Vi;
             console.log(`Store Station ${this.tag} stored value ${this.Vi} at address ${this.address}`);
-            this.operationPerformed = true; // Mark operation as performed
+            this.operationPerformed = true;
         }
     }
 
@@ -60,6 +60,6 @@ class StoreReservationStation {
     }
 
     isExecuting() {
-        return this.time > 0;
+        return this.time >= 0;
     }
 }
