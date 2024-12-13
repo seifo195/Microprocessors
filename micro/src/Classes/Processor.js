@@ -104,6 +104,16 @@ class Processor {
     updateLatencies(newLatencies) {
         this.latencies = { ...this.latencies, ...newLatencies };
     }
+
+    // Execute all available reservation stations
+    execute() {
+        // Execute all active reservation stations
+        Object.values(this.reservationStations).flat().forEach(station => {
+            if (station.busy && station.isReady()) {
+                station.execute();
+            }
+        });
+    }
 }
 
 function main(){
