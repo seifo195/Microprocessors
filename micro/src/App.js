@@ -5,6 +5,7 @@ import Regfile from './Components/Regfile.js';
 import InstructionQueue from './Components/instructionqeueu.js';
 import Load from './Components/Load.js';
 import Store from './Components/Store.js'; 
+import Cache from './Components/Cache.js';
 import { useState, useEffect } from 'react';
 import { TomasuloController } from './logic/logic.js';
 import { parseInstruction } from './instructionParser.js';
@@ -18,7 +19,7 @@ function App() {
     mult: 5
   });
   const [cacheConfig, setCacheConfig] = useState({
-    cacheSize: 4096,
+    cacheSize: Math.pow(2, 3),
     blockSize: 64
   });
 
@@ -34,6 +35,12 @@ function App() {
 
   const [instructions, setInstructions] = useState([]);
   const [parsedInstructions, setParsedInstructions] = useState([]);
+
+  // Add an exponent state for block size
+  const [blockSizeExponent, setBlockSizeExponent] = useState(3); // Start from 2^3
+
+  // Update the block size based on the exponent
+  const blockSize = Math.pow(2, blockSizeExponent); // Calculate the block size
 
   // Function to handle applying all changes
   const handleApplyChanges = () => {
@@ -156,22 +163,20 @@ function App() {
           <input 
             type="number" 
             id="cacheSize" 
-            min="1"
-            step="1024"
-            value={tempConfig.cacheSize}
-            onChange={(e) => handleTempChange('cacheSize', e.target.value)}
+            value={cacheConfig.cacheSize} // Use the calculated cache size
+            readOnly // Make it read-only to prevent manual input
           />
+          <button onClick={() => setCacheConfig(prev => ({ ...prev, cacheSize: Math.pow(2, Math.log2(prev.cacheSize) + 1) }))}>Increase</button>
         </div>
         <div className="input-group">
           <label htmlFor="blockSize">Block Size (bytes):</label>
           <input 
             type="number" 
             id="blockSize" 
-            min="1"
-            step="16"
-            value={tempConfig.blockSize}
-            onChange={(e) => handleTempChange('blockSize', e.target.value)}
+            value={blockSize} // Use the calculated block size
+            readOnly // Make it read-only to prevent manual input
           />
+          <button onClick={() => setBlockSizeExponent(prev => prev + 1)}>Increase</button>
         </div>
       </div>
 
@@ -261,7 +266,7 @@ function App() {
       <div className="simulator-layout">
         {/* Top row */}
         <div className="top-row">
-          <InstructionQueue />
+          <InstructionQueue instructions={parsedInstructions} />
           <Regfile />
         </div>
         
@@ -278,11 +283,9 @@ function App() {
         </div>
       </div>
 
-      <div style={{margin: '20px', textAlign: 'left'}}>
-        <h3>Parsed Instructions:</h3>
-        <pre>{JSON.stringify(parsedInstructions, null, 2)}</pre>
-      </div>
+      <Cache cacheSize={cacheConfig.cacheSize} blockSize={cacheConfig.blockSize} />
     </div>
+    
   );
 }
 

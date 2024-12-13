@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import "./MultRS.css";
 
 const MultRS = ({ stationSize }) => {
   const [stations, setStations] = useState(
@@ -50,39 +51,40 @@ const MultRS = ({ stationSize }) => {
   
 
   return (
-    <div style={{ margin: "20px" }}>
-      <h2>Multiply Reservation Station</h2>
-      <table border="1" style={{ borderCollapse: "collapse", width: "100%" }}>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Busy</th>
-            <th>Instruction</th>
-            <th>Vj</th>
-            <th>Vk</th>
-            <th>Qj</th>
-            <th>Qk</th>
-            <th>Address</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stations.map((station, index) => (
-            <tr key={index}>
-              <td>{index + 1}</td>
-              <td>{station.busy ? "Yes" : "No"}</td>
-              <td>{station.instruction}</td>
-              <td>{station.Vj ?? "-"}</td>
-              <td>{station.Vk ?? "-"}</td>
-              <td>{station.Qj ?? "-"}</td>
-              <td>{station.Qk ?? "-"}</td>
-              <td>{station.Address ?? "-"}</td>
+    <div className="mult-rs">
+      <div className="rs-title">
+        <h2>Multiply Reservation Station</h2>
+      </div>
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Busy</th>
+              <th>Instruction</th>
+              <th>Vj</th>
+              <th>Vk</th>
+              <th>Qj</th>
+              <th>Qk</th>
+              <th>Address</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <button onClick={handleChange}>
-        Modify RS
-      </button>
+          </thead>
+          <tbody>
+            {stations.map((station, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{station.busy ? "Yes" : "No"}</td>
+                <td>{station.instruction}</td>
+                <td>{station.Vj ?? "-"}</td>
+                <td>{station.Vk ?? "-"}</td>
+                <td>{station.Qj ?? "-"}</td>
+                <td>{station.Qk ?? "-"}</td>
+                <td>{station.Address ?? "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

@@ -679,7 +679,7 @@ function main() {
     // Create test instructions with dependencies
     const instructions = [
         { type: 'ADD.D', dest: 'F6', src1: 'F2', src2: 'F4' },  // F6 = F2 + F4
-        { type: 'L.D', src: 'F6', address: 100 },               // Store F6 to memory[100]
+        { type: 'S.D', src: 'F6', address: 100 },               // Store F6 to memory[100]
         { type: 'ADD.D', dest: 'F8', src1: 'F6', src2: 'F2' }   // F8 = F6 + F2 (RAW dependency)
     ];
 
