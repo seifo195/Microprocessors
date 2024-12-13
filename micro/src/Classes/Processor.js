@@ -183,83 +183,117 @@ class Processor {
 
     executeStations() {
         const executingStations = [];
-
+    
         // Execute load buffers
         this.loadBuffers.forEach(buffer => {
-            if (buffer.busy && buffer.time > 0) {
-                buffer.time--;
-                executingStations.push({
-                    operation: buffer.operation,
-                    tag: buffer.tag,
-                    time: buffer.time
-                });
-                
-                if (buffer.time === 0) {
-                    // Load is complete, get value from cache
-                    buffer.result = this.cache.getMemoryValue(buffer.address);
-                    this.busyPublishers.push(buffer);
-                    console.log(`Load completed: Read ${buffer.result} from address ${buffer.address}`);
+            if (buffer.busy) {
+                // Only start executing if dependencies are resolved
+                if (buffer.Qi) {
+                    console.log(`Load buffer ${buffer.tag} waiting for ${buffer.Qi}`);
+                    return;
+                }
+    
+                if (buffer.time > 0) {
+                    buffer.time--;
+                    executingStations.push({
+                        operation: buffer.operation,
+                        tag: buffer.tag,
+                        time: buffer.time
+                    });
+    
+                    if (buffer.time === 0) {
+                        buffer.result = this.cache.getMemoryValue(buffer.address);
+                        this.busyPublishers.push(buffer);
+                        console.log(`Load completed: Read ${buffer.result} from address ${buffer.address}`);
+                    }
                 }
             }
         });
-
+    
         // Execute store buffers first if they're ready
         this.storeBuffers.forEach(buffer => {
-            if (buffer.busy && buffer.Q === null && buffer.time > 0) {
-                // Store is ready to execute (its value is available)
-                buffer.time--;
-                executingStations.push({
-                    operation: buffer.operation,
-                    tag: buffer.tag,
-                    time: buffer.time
-                });
-                
-                if (buffer.time === 0) {
-                    this.cache.Insertintomemory(buffer.address, buffer.value);
-                    this.busyPublishers.push(buffer);
-                    console.log(`Store completed: Writing ${buffer.value} to address ${buffer.address}`);
+            if (buffer.busy) {
+                if (buffer.Q === null) {
+                    // Store is ready to execute (its value is available)
+                    buffer.time--;
+                    executingStations.push({
+                        operation: buffer.operation,
+                        tag: buffer.tag,
+                        time: buffer.time
+                    });
+    
+                    if (buffer.time === 0) {
+                        this.cache.Insertintomemory(buffer.address, buffer.value);
+                        this.busyPublishers.push(buffer);
+                        console.log(`Store completed: Writing ${buffer.value} to address ${buffer.address}`);
+                    }
+                } else {
+                    console.log(`Store ${buffer.tag} waiting for ${buffer.Q}`);
                 }
-            } else if (buffer.busy && buffer.Q !== null) {
-                console.log(`Store ${buffer.tag} waiting for ${buffer.Q}`);
             }
         });
+    
+        
+        // Execute computational instructions
+        [...this.addStations, ...this.mulStations].forEach(station => {
+            if (station.busy) {
+                // If station has already started executing (time < initial latency), continue
+                const initialLatency = this.getOperationLatency(station.operation);
+                if (station.time < initialLatency) {
+                    station.execute();
+                    executingStations.push({
+                        operation: station.operation,
+                        tag: station.tag,
+                        time: station.time
+                    });
+                    if (station.isCompleted()) {
+                        this.busyPublishers.push(station);
+                    }
+                }
+                // If station hasn't started yet, check dependencies
+                else if (station.isReady()) {
+                    // Check if any of this station's source registers are being loaded
+                    const dependsOnLoad = this.loadBuffers.some(buffer => 
+                        buffer.busy && 
+                        (buffer.dest === station.src1 || buffer.dest === station.src2)
+                    );
 
-        // Only execute computational instructions if there are no executing stores
-        const hasExecutingStore = this.storeBuffers.some(buffer => 
-            buffer.busy && buffer.Q === null && buffer.time > 0
-        );
-
-        if (!hasExecutingStore) {
-            // Execute Add and Mul stations
-            [...this.addStations, ...this.mulStations].forEach(station => {
-                if (station.busy) {
-                    if (station.isReady()) {
+                    if (!dependsOnLoad) {
                         station.execute();
                         executingStations.push({
                             operation: station.operation,
                             tag: station.tag,
                             time: station.time
                         });
-                        if (station.isCompleted()) {
-                            this.busyPublishers.push(station);
-                        }
                     } else {
-                        console.log(`${station.tag} waiting for: Qi=${station.Qi}, Qj=${station.Qj}`);
+                        console.log(`${station.tag} waiting for load to complete`);
                     }
+                } else {
+                    console.log(`${station.tag} waiting for dependencies`);
                 }
-            });
-        } else {
-            console.log("Computational instructions waiting for store to complete");
-        }
+            }
+        });
 
+        
         return executingStations;
     }
+    
 
     handleWriteBack() {
         if (this.busyPublishers.length === 0) return null;
 
         const publisher = this.busyPublishers.shift();
-        let result;
+        let result = publisher.result || publisher.broadcast();
+        const executingStations = [];
+
+
+        // Update load buffers' dependencies
+        this.loadBuffers.forEach(buffer => {
+            if (buffer.busy && buffer.Qi === publisher.tag) {
+                buffer.Qi = null;  // Clear the dependency
+                console.log(`Load buffer ${buffer.tag} dependency resolved from ${publisher.tag}`);
+            }
+        });
 
         if (publisher.tag.startsWith('STORE')) {
             result = publisher.value;
@@ -285,19 +319,32 @@ class Processor {
             // For computational units (ADD, MUL, LOAD)
             result = publisher.broadcast();
             
-            // Update store buffers
+            // Update store buffers and track if result will be stored
+            let resultWillBeStored = false;
             this.storeBuffers.forEach(buffer => {
                 if (buffer.busy && buffer.Q === publisher.tag) {
                     buffer.value = result;
                     buffer.Q = null;
+                    buffer.time--;  // Decrement time immediately
+                    resultWillBeStored = true;
                     console.log(`Updated store buffer with value ${result}`);
+                    console.log(`Store starting execution, time remaining: ${buffer.time}`);
                 }
             });
 
             // Update Add and Mul stations
             [...this.addStations, ...this.mulStations].forEach(station => {
                 if (station.busy) {
-                    station.updateQ(publisher.tag, result);
+                    if (station.Qi === publisher.tag && resultWillBeStored) {
+                        station.Qi = 'STORE0';  // Set dependency to store
+                    } else if (station.Qi === publisher.tag) {
+                        station.updateQ(publisher.tag, result);
+                    }
+                    if (station.Qj === publisher.tag && resultWillBeStored) {
+                        station.Qj = 'STORE0';  // Set dependency to store
+                    } else if (station.Qj === publisher.tag) {
+                        station.updateQ(publisher.tag, result);
+                    }
                 }
             });
 
@@ -345,6 +392,15 @@ class Processor {
         availableBuffer.address = instruction.address;
         availableBuffer.tag = `LD${this.loadBuffers.indexOf(availableBuffer)}`;
         availableBuffer.time = 3;  // Set load latency to 3 cycles
+
+        // Add dependency tracking for source register
+        if (instruction.src) {
+            const srcStatus = this.registerStatus[instruction.src];
+            if (srcStatus) {
+                availableBuffer.Qi = srcStatus;  // Track dependency
+                console.log(`Load buffer waiting for ${srcStatus} to compute ${instruction.src}`);
+            }
+        }
         
         console.log(`Issued load instruction to ${availableBuffer.tag}`);
 
@@ -360,35 +416,45 @@ class Processor {
     issueToAddStation(instruction) {
         const availableStation = this.addStations.find(station => !station.busy);
         if (!availableStation) return null;
-
+    
         availableStation.busy = true;
         availableStation.operation = instruction.type;
         availableStation.time = this.getOperationLatency(instruction.type);
-
-        // Check source operand dependencies
+    
+        // Check source operand dependencies (src1)
         if (instruction.src1) {
             // First check register status
             const src1Status = this.registerStatus[instruction.src1];
             if (src1Status) {
                 availableStation.Qi = src1Status;
                 availableStation.Vi = null;
+                console.log(`ADD station waiting for ${src1Status} to compute ${instruction.src1}`);
             } else {
-                // Check if the register is being stored
-                const pendingStore = this.storeBuffers.find(buffer => 
+                // Check if the register is being used by a load/store
+                const pendingLoad = this.loadBuffers.find(buffer =>
                     buffer.busy && buffer.src === instruction.src1
                 );
-                if (pendingStore) {
+                const pendingStore = this.storeBuffers.find(buffer =>
+                    buffer.busy && buffer.src === instruction.src1
+                );
+    
+                if (pendingLoad) {
+                    availableStation.Qi = pendingLoad.tag;
+                    availableStation.Vi = null;
+                    console.log(`ADD station waiting for load ${pendingLoad.tag} to complete for ${instruction.src1}`);
+                } else if (pendingStore) {
                     availableStation.Qi = pendingStore.tag;
                     availableStation.Vi = null;
+                    console.log(`ADD station waiting for store ${pendingStore.tag} to complete for ${instruction.src1}`);
                 } else {
                     availableStation.Qi = null;
                     availableStation.Vi = this.getRegisterValue(instruction.src1).value;
                 }
             }
-
+    
             // Additional check for stores using this register
             if (!availableStation.Qi) {
-                const storeUsingReg = this.storeBuffers.find(buffer => 
+                const storeUsingReg = this.storeBuffers.find(buffer =>
                     buffer.busy && buffer.src === instruction.src1
                 );
                 if (storeUsingReg) {
@@ -397,29 +463,41 @@ class Processor {
                 }
             }
         }
-
+    
+        // Check source operand dependencies (src2)
         if (instruction.src2) {
+            // First check register status
             const src2Status = this.registerStatus[instruction.src2];
             if (src2Status) {
                 availableStation.Qj = src2Status;
                 availableStation.Vj = null;
+                console.log(`ADD station waiting for ${src2Status} to compute ${instruction.src2}`);
             } else {
-                // Check if the register is being stored
-                const pendingStore = this.storeBuffers.find(buffer => 
+                // Check if the register is being used by a load/store
+                const pendingLoad = this.loadBuffers.find(buffer =>
                     buffer.busy && buffer.src === instruction.src2
                 );
-                if (pendingStore) {
+                const pendingStore = this.storeBuffers.find(buffer =>
+                    buffer.busy && buffer.src === instruction.src2
+                );
+    
+                if (pendingLoad) {
+                    availableStation.Qj = pendingLoad.tag;
+                    availableStation.Vj = null;
+                    console.log(`ADD station waiting for load ${pendingLoad.tag} to complete for ${instruction.src2}`);
+                } else if (pendingStore) {
                     availableStation.Qj = pendingStore.tag;
                     availableStation.Vj = null;
+                    console.log(`ADD station waiting for store ${pendingStore.tag} to complete for ${instruction.src2}`);
                 } else {
                     availableStation.Qj = null;
                     availableStation.Vj = this.getRegisterValue(instruction.src2).value;
                 }
             }
-
+    
             // Additional check for stores using this register
             if (!availableStation.Qj) {
-                const storeUsingReg = this.storeBuffers.find(buffer => 
+                const storeUsingReg = this.storeBuffers.find(buffer =>
                     buffer.busy && buffer.src === instruction.src2
                 );
                 if (storeUsingReg) {
@@ -428,55 +506,92 @@ class Processor {
                 }
             }
         }
-
+    
         // Update register status for destination
         if (instruction.dest) {
             this.registerStatus[instruction.dest] = availableStation.tag;
         }
-
+    
         return availableStation;
     }
+    
 
     issueToMulStation(instruction) {
         const availableStation = this.mulStations.find(station => !station.busy);
         if (!availableStation) return null;
-
+    
         availableStation.busy = true;
         availableStation.operation = instruction.type;
         availableStation.time = this.getOperationLatency(instruction.type);
-
-        // Handle source operands
+    
+        // Check source operand dependencies
         if (instruction.src1) {
-            // Check if src1 is waiting for a result
+            // First check register status
             const src1Status = this.registerStatus[instruction.src1];
             if (src1Status) {
                 availableStation.Qi = src1Status;
                 availableStation.Vi = null;
                 console.log(`MUL station waiting for ${src1Status} to compute ${instruction.src1}`);
             } else {
-                availableStation.Qi = null;
-                availableStation.Vi = this.getRegisterValue(instruction.src1).value;
+                // Check if the register is being used by a load/store
+                const pendingLoad = this.loadBuffers.find(buffer => 
+                    buffer.busy && buffer.src === instruction.src1
+                );
+                const pendingStore = this.storeBuffers.find(buffer => 
+                    buffer.busy && buffer.src === instruction.src1
+                );
+                
+                if (pendingLoad) {
+                    availableStation.Qi = pendingLoad.tag;
+                    availableStation.Vi = null;
+                    console.log(`MUL station waiting for load ${pendingLoad.tag} to complete for ${instruction.src1}`);
+                } else if (pendingStore) {
+                    availableStation.Qi = pendingStore.tag;
+                    availableStation.Vi = null;
+                    console.log(`MUL station waiting for store ${pendingStore.tag} to complete for ${instruction.src1}`);
+                } else {
+                    availableStation.Qi = null;
+                    availableStation.Vi = this.getRegisterValue(instruction.src1).value;
+                }
             }
         }
-
+    
         if (instruction.src2) {
-            // Check if src2 is waiting for a result
+            // First check register status
             const src2Status = this.registerStatus[instruction.src2];
             if (src2Status) {
                 availableStation.Qj = src2Status;
                 availableStation.Vj = null;
                 console.log(`MUL station waiting for ${src2Status} to compute ${instruction.src2}`);
             } else {
-                availableStation.Qj = null;
-                availableStation.Vj = this.getRegisterValue(instruction.src2).value;
+                // Check if the register is being used by a load/store
+                const pendingLoad = this.loadBuffers.find(buffer => 
+                    buffer.busy && buffer.src === instruction.src2
+                );
+                const pendingStore = this.storeBuffers.find(buffer => 
+                    buffer.busy && buffer.src === instruction.src2
+                );
+                
+                if (pendingLoad) {
+                    availableStation.Qj = pendingLoad.tag;
+                    availableStation.Vj = null;
+                    console.log(`MUL station waiting for load ${pendingLoad.tag} to complete for ${instruction.src2}`);
+                } else if (pendingStore) {
+                    availableStation.Qj = pendingStore.tag;
+                    availableStation.Vj = null;
+                    console.log(`MUL station waiting for store ${pendingStore.tag} to complete for ${instruction.src2}`);
+                } else {
+                    availableStation.Qj = null;
+                    availableStation.Vj = this.getRegisterValue(instruction.src2).value;
+                }
             }
         }
-
-        // Update destination register status
+    
+        // Update register status for destination
         if (instruction.dest) {
             this.registerStatus[instruction.dest] = availableStation.tag;
         }
-
+    
         return availableStation;
     }
 
