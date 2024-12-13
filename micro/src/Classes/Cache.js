@@ -181,16 +181,15 @@ class Cache {
             this.hits++;
             this.accessCount++;
             
-            // Collect the bytes from cache and convert to integer
-            let intValue = 0n; // Use BigInt to handle larger values
+            // Read the requested number of bytes from cache
+            let intValue = 0;
             for (let i = 0; i < bytesToCheck; i++) {
                 const currentAddress = address + i;
                 const currentBlockAddress = this.getBlockAddress(currentAddress);
                 const currentIndex = this.getIndex(currentAddress);
                 
-                // Reconstruct integer by shifting and adding bytes
                 // Assumes big-endian representation
-                intValue = (intValue << 8n) | BigInt(this.Cache[currentBlockAddress][currentIndex]);
+                intValue = (intValue << 8) | Number(this.Cache[currentBlockAddress][currentIndex]);
             }
     
             return {
@@ -206,7 +205,7 @@ class Cache {
             this.loadBlockIntoCache(address);
     
             // After loading the block, read the data from cache
-            let intValue = 0n;
+            let intValue = 0;
             try {
                 for (let i = 0; i < bytesToCheck; i++) {
                     const currentAddress = address + i;
@@ -217,11 +216,11 @@ class Cache {
                     const byteValue = this.Cache[currentBlockAddress]?.[currentIndex] ?? 0;
                     
                     // Reconstruct integer by shifting and adding bytes
-                    intValue = (intValue << 8n) | BigInt(byteValue);
+                    intValue = (intValue << 8) | Number(byteValue);
                 }
             } catch (error) {
                 console.warn(`Warning: Error processing address ${address}:`, error);
-                intValue = 0n;
+                intValue = 0;
             }
     
             return {
@@ -234,19 +233,21 @@ class Cache {
     // Helper method to convert value to bytes
     convertValueToBytes(value, numBytes) {
         const bytes = [];
-        let remainingValue = BigInt(value);
-    
-        // Convert to bytes in big-endian order
+        let tempValue = Number(value); // Convert to regular number
+
         for (let i = 0; i < numBytes; i++) {
-            // Extract the least significant byte
-            const byte = Number(remainingValue & 0xFFn);
-            bytes.unshift(byte); // Prepend to maintain big-endian order
-            
-            // Shift right by 8 bits
-            remainingValue >>= 8n;
+            bytes.push(tempValue & 0xFF);
+            tempValue = tempValue >> 8;
         }
-    
         return bytes;
+    }
+
+    convertBytesToValue(bytes) {
+        let value = 0;
+        for (let i = bytes.length - 1; i >= 0; i--) {
+            value = (value << 8) | bytes[i];
+        }
+        return value;
     }
  
     getMemoryValue(address) {

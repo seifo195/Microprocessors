@@ -6,286 +6,179 @@ import InstructionQueue from './Components/instructionqeueu.js';
 import Load from './Components/Load.js';
 import Store from './Components/Store.js'; 
 import Cache from './Components/Cache.js';
-import { useState, useEffect } from 'react';
-import { TomasuloController } from './logic/logic.js';
-import { parseInstruction } from './instructionParser.js';
+import { useState } from 'react';
+import { Processor } from './Classes/Processor.js';
 
 function App() {
-  const [controller] = useState(() => new TomasuloController());
-  const [stationSizes, setStationSizes] = useState({
-    load: 3,
-    store: 3,
-    add: 4,
-    mult: 5
+  const [processor, setProcessor] = useState(null);
+  const [config, setConfig] = useState({
+    addStations: 3,
+    mulStations: 2,
+    loadBuffers: 3,
+    storeBuffers: 3,
+    cacheSize: 128,
+    blockSize: 16
   });
-  const [cacheConfig, setCacheConfig] = useState({
-    cacheSize: Math.pow(2, 3),
-    blockSize: 64
-  });
+  const [processorState, setProcessorState] = useState(null);
 
-  // Add temporary state for input values
-  const [tempConfig, setTempConfig] = useState({
-    cacheSize: 4096,
-    blockSize: 64,
-    load: 3,
-    store: 3,
-    add: 4,
-    mult: 5
-  });
+  // Initialize processor when config changes
+  const initializeProcessor = () => {
+    const newProcessor = new Processor(config);
+    
+    // Pre-load test values
+    newProcessor.cache.Insertintomemory(100, 50);
+    newProcessor.cache.Insertintomemory(104, 30);
+    newProcessor.registerFile.integer[1] = 100;
+    newProcessor.registerFile.floating[2] = 10.0;
+    newProcessor.registerFile.floating[4] = 20.0;
 
-  const [instructions, setInstructions] = useState([]);
-  const [parsedInstructions, setParsedInstructions] = useState([]);
+    // Add test instructions
+    newProcessor.instructionQueue = [
+      { type: 'ADD.D', dest: 'F6', src1: 'F2', src2: 'F4' },
+      { type: 'S.D', src: 'F6', address: 100 },
+      { type: 'ADD.D', dest: 'F8', src1: 'F6', src2: 'F2' }
+    ];
 
-  // Add an exponent state for block size
-  const [blockSizeExponent, setBlockSizeExponent] = useState(3); // Start from 2^3
-
-  // Update the block size based on the exponent
-  const blockSize = Math.pow(2, blockSizeExponent); // Calculate the block size
-
-  // Function to handle applying all changes
-  const handleApplyChanges = () => {
-    setStationSizes({
-      load: tempConfig.load,
-      store: tempConfig.store,
-      add: tempConfig.add,
-      mult: tempConfig.mult
-    });
-    setCacheConfig({
-      cacheSize: tempConfig.cacheSize,
-      blockSize: tempConfig.blockSize
-    });
+    setProcessor(newProcessor);
+    setProcessorState(newProcessor.updateStatus());
   };
 
-  // Update input handlers to modify temporary state
-  const handleTempChange = (type, value) => {
-    setTempConfig(prev => ({
+  // Update processor state after each cycle
+  const handleNextCycle = () => {
+    if (processor) {
+      processor.cycle();
+      const newState = {
+        clock: processor.clock,
+        addStations: processor.addStations,
+        mulStations: processor.mulStations,
+        loadBuffers: processor.loadBuffers,
+        storeBuffers: processor.storeBuffers,
+        cache: processor.cache,
+        registers: processor.registerFile,
+        instructionQueue: processor.instructionQueue
+      };
+      setProcessorState(newState);
+    }
+  };
+
+  // Handle configuration changes
+  const handleConfigChange = (e) => {
+    const { name, value } = e.target;
+    setConfig(prev => ({
       ...prev,
-      [type]: parseInt(value) || 0
+      [name]: parseInt(value, 10)
     }));
   };
 
-  // Add this function to handle new instructions
-  const handleNewInstruction = (instructionString) => {
-    const parsedInstruction = parseInstruction(instructionString);
-    setParsedInstructions(prev => [...prev, parsedInstruction]);
-  };
-
-  const options = [
-    // Integer ALU operations
-    'DADDI',
-    'DSUBI',
-    // Floating point operations
-    'ADD.D',
-    'ADD.S',
-    'SUB.D',
-    'SUB.S',
-    'MUL.D',
-    'MUL.S',
-    'DIV.D',
-    'DIV.S',
-    // Memory operations
-    'LW',
-    'LD',
-    'L.S',
-    'L.D',
-    'SW',
-    'SD',
-    'S.S',
-    'S.D',
-    // Branch operations
-    'BNE',
-    'BEQ'
-  ];
-  
-  // Log updated station sizes and cache config after they change
-  useEffect(() => {
-    console.log('Updated station sizes:', {
-      'Add RS': stationSizes.add,
-      'Mult RS': stationSizes.mult,
-      'Load RS': stationSizes.load,
-      'Store RS': stationSizes.store
-    });
-
-    console.log('Updated cache config:', {
-      'Cache Size': cacheConfig.cacheSize,
-      'Block Size': cacheConfig.blockSize
-    });
-  }, [stationSizes, cacheConfig]);
-
-  const handleConfigUpdate = (newConfig) => {
-    // Log the new configuration
-    console.log('Applying new configuration:');
-    console.log({
-      'Add RS Size': newConfig.add,
-      'Multiply RS Size': newConfig.mult,
-      'Load RS Size': newConfig.load,
-      'Store RS Size': newConfig.store,
-      'Cache Size (bytes)': newConfig.cacheSize,
-      'Block Size (bytes)': newConfig.blockSize
-    });
-
-    // Update the controller
-    controller.updateConfiguration({
-      addStations: newConfig.add,
-      multStations: newConfig.mult,
-      loadStations: newConfig.load,
-      storeStations: newConfig.store,
-      cacheSize: newConfig.cacheSize,
-      blockSize: newConfig.blockSize
-    });
-
-    // Update local UI state
-    setStationSizes({
-      load: newConfig.load,
-      store: newConfig.store,
-      add: newConfig.add,
-      mult: newConfig.mult
-    });
-
-    setCacheConfig({
-      cacheSize: newConfig.cacheSize,
-      blockSize: newConfig.blockSize
-    });
-  };
-
-  const handleLatencyUpdate = (newLatencies) => {
-    controller.updateLatencies(newLatencies);
-    // Force a re-render or update state as needed
-  };
-
   return (
-    <div className="App">   
-      <h1>Tomasulo Algorithm Simulator</h1>
-      
-      <div className="config-controls">
-        <div className="input-group">
-          <label htmlFor="cacheSize">Cache Size (bytes):</label>
-          <input 
-            type="number" 
-            id="cacheSize" 
-            value={cacheConfig.cacheSize} // Use the calculated cache size
-            readOnly // Make it read-only to prevent manual input
-          />
-          <button onClick={() => setCacheConfig(prev => ({ ...prev, cacheSize: Math.pow(2, Math.log2(prev.cacheSize) + 1) }))}>Increase</button>
+    <div className="app-container">
+      <div className="config-section">
+        <h2>Processor Configuration</h2>
+        <div className="config-inputs">
+          <label>
+            Add Stations:
+            <input
+              type="number"
+              name="addStations"
+              value={config.addStations}
+              onChange={handleConfigChange}
+            />
+          </label>
+          <label>
+            Multiply Stations:
+            <input
+              type="number"
+              name="mulStations"
+              value={config.mulStations}
+              onChange={handleConfigChange}
+            />
+          </label>
+          <label>
+            Load Buffers:
+            <input
+              type="number"
+              name="loadBuffers"
+              value={config.loadBuffers}
+              onChange={handleConfigChange}
+            />
+          </label>
+          <label>
+            Store Buffers:
+            <input
+              type="number"
+              name="storeBuffers"
+              value={config.storeBuffers}
+              onChange={handleConfigChange}
+            />
+          </label>
+          <label>
+            Cache Size (bytes):
+            <input
+              type="number"
+              name="cacheSize"
+              value={config.cacheSize}
+              onChange={handleConfigChange}
+            />
+          </label>
+          <label>
+            Block Size (bytes):
+            <input
+              type="number"
+              name="blockSize"
+              value={config.blockSize}
+              onChange={handleConfigChange}
+            />
+          </label>
         </div>
-        <div className="input-group">
-          <label htmlFor="blockSize">Block Size (bytes):</label>
-          <input 
-            type="number" 
-            id="blockSize" 
-            value={blockSize} // Use the calculated block size
-            readOnly // Make it read-only to prevent manual input
-          />
-          <button onClick={() => setBlockSizeExponent(prev => prev + 1)}>Increase</button>
-        </div>
+        <button onClick={initializeProcessor}>Initialize Processor</button>
       </div>
 
-      <div className="config-controls">
-        <div className="input-group">
-          <label htmlFor="loadSize">Load RS Size:</label>
-          <input 
-            type="number" 
-            id="loadSize" 
-            min="1"
-            max="10"
-            value={tempConfig.load}
-            onChange={(e) => handleTempChange('load', e.target.value)}
-          />
-        </div>
-        <div className="input-group">
-          <label htmlFor="storeSize">Store RS Size:</label>
-          <input 
-            type="number" 
-            id="storeSize" 
-            min="1"
-            max="10"
-            value={tempConfig.store}
-            onChange={(e) => handleTempChange('store', e.target.value)}
-          />
-        </div>
-        <div className="input-group">
-          <label htmlFor="addSize">Add RS Size:</label>
-          <input 
-            type="number" 
-            id="addSize" 
-            min="1"
-            max="10"
-            value={tempConfig.add}
-            onChange={(e) => handleTempChange('add', e.target.value)}
-          />
-        </div>
-        <div className="input-group">
-          <label htmlFor="multSize">Multiply RS Size:</label>
-          <input 
-            type="number" 
-            id="multSize" 
-            min="1"
-            max="10"
-            value={tempConfig.mult}
-            onChange={(e) => handleTempChange('mult', e.target.value)}
-          />
-        </div>
-      </div>
+      {processor && (
+        <>
+          <button 
+            onClick={handleNextCycle}
+            className="next-cycle-button"
+          >
+            Next Cycle ({processorState?.clock || 0})
+          </button>
 
-      <div className="config-controls">
-        <button 
-          className="apply-button" 
-          onClick={() => handleConfigUpdate(tempConfig)}
-        >
-          Apply Changes
-        </button>
-      </div>
+          <div className="processor-state">
+            <InstructionQueue 
+              instructions={processorState?.instructionQueue || []}
+              latencies={config.latencies}
+            />
+            
+            <div className="stations-container">
+              <Load 
+                stationSize={config.loadBuffers} 
+                stations={processorState?.loadBuffers || []}
+              />
+              <Store 
+                stationSize={config.storeBuffers} 
+                stations={processorState?.storeBuffers || []}
+              />
+              <AddRS 
+                stationSize={config.addStations} 
+                stations={processorState?.addStations || []}
+              />
+              <MultRS 
+                stationSize={config.mulStations} 
+                stations={processorState?.mulStations || []}
+              />
+            </div>
 
-      <div className="file-upload">
-        <input
-          type="file"
-          accept=".txt"
-          onChange={(e) => {
-            const file = e.target.files[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                const text = e.target.result;
-                const lines = text.split('\n');
-                const newInstructions = [];
-                lines.forEach(line => {
-                  if (line.trim()) {
-                    const parsed = parseInstruction(line.trim());
-                    newInstructions.push(parsed);
-                  }
-                });
-                setParsedInstructions(newInstructions);
-              };
-              reader.readAsText(file);
-            }
-          }}
-        />
-        <label>Upload Instructions File</label>
-      </div>
-
-      <div className="simulator-layout">
-        {/* Top row */}
-        <div className="top-row">
-          <InstructionQueue instructions={parsedInstructions} />
-          <Regfile />
-        </div>
-        
-        {/* Bottom row */}
-        <div className="reservation-stations">
-          <div className="rs-row">
-            <AddRS stationSize={stationSizes.add} />
-            <MultRS stationSize={stationSizes.mult} />
+            <div className="memory-container">
+              <Regfile registers={processorState?.registers || {}} />
+              <Cache 
+                cache={processorState?.cache}
+                cacheSize={config.cacheSize}
+                blockSize={config.blockSize}
+              />
+            </div>
           </div>
-          <div className="memory-row">
-            <Load stationSize={stationSizes.load} />
-            <Store stationSize={stationSizes.store} />
-          </div>
-        </div>
-      </div>
-
-      <Cache cacheSize={cacheConfig.cacheSize} blockSize={cacheConfig.blockSize} />
+        </>
+      )}
     </div>
-    
   );
 }
 
