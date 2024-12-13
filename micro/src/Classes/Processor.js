@@ -19,6 +19,20 @@ class Processor {
             fpRegisters: 32,
             cacheSize: 1024,
             blockSize: 64,
+            latencies: {
+                'ADD.D': 2,
+                'SUB.D': 2,
+                'MUL.D': 10,
+                'DIV.D': 40,
+                'L.D': 2,
+                'S.D': 2,
+                'ADD.S': 2,
+                'SUB.S': 2,
+                'MUL.S': 10,
+                'DIV.S': 40,
+                'L.S': 2,
+                'S.S': 2
+            },
             ...config
         };
 
@@ -144,14 +158,22 @@ class Processor {
         if (this.instructionQueue.length === 0) return null;
 
         const instruction = this.instructionQueue[0];
-        
-        // Check for WAW hazards only
+        let targetStation = null;
+
+        // Check for WAW hazards
         if (instruction.dest && this.registerStatus[instruction.dest]) {
             console.log(`WAW hazard detected: ${instruction.dest} is already waiting for ${this.registerStatus[instruction.dest]}`);
             return null;
         }
 
-        let targetStation = null;
+        // Check for WAR hazards
+        const hasWARHazard = [...this.addStations, ...this.mulStations].some(station => 
+            station.busy && (station.Qi === instruction.src1 || station.Qj === instruction.src2)
+        );
+        if (hasWARHazard) {
+            console.log(`WAR hazard detected: Source registers are being written to by previous instructions`);
+            return null;
+        }
 
         switch(instruction.type) {
             case 'ADD.D':
@@ -176,6 +198,7 @@ class Processor {
 
         if (targetStation) {
             this.instructionQueue.shift();
+            instruction.issueCycle = this.clock;
             return instruction;
         }
         return null;
@@ -184,54 +207,44 @@ class Processor {
     executeStations() {
         const executingStations = [];
 
-        // Execute store buffers first if they're ready
+        // Execute store buffers only if their dependencies are resolved
         this.storeBuffers.forEach(buffer => {
-            if (buffer.busy && buffer.Q === null && buffer.time > 0) {
-                // Store is ready to execute (its value is available)
-                buffer.time--;
-                executingStations.push({
-                    operation: buffer.operation,
-                    tag: buffer.tag,
-                    time: buffer.time
-                });
-                
-                if (buffer.time === 0) {
-                    this.cache.Insertintomemory(buffer.address, buffer.value);
-                    this.busyPublishers.push(buffer);
-                    console.log(`Store completed: Writing ${buffer.value} to address ${buffer.address}`);
+            if (buffer.busy) {
+                if (buffer.Q === null && buffer.time > 0) {
+                    buffer.time--;
+                    executingStations.push({
+                        operation: buffer.operation,
+                        tag: buffer.tag,
+                        time: buffer.time
+                    });
+                    
+                    if (buffer.time === 0) {
+                        this.cache.Insertintomemory(buffer.address, buffer.value);
+                        this.busyPublishers.push(buffer);
+                    }
+                } else if (buffer.Q) {
+                    console.log(`Store ${buffer.tag} waiting for value from ${buffer.Q}`);
                 }
-            } else if (buffer.busy && buffer.Q !== null) {
-                console.log(`Store ${buffer.tag} waiting for ${buffer.Q}`);
             }
         });
 
-        // Only execute computational instructions if there are no executing stores
-        const hasExecutingStore = this.storeBuffers.some(buffer => 
-            buffer.busy && buffer.Q === null && buffer.time > 0
-        );
-
-        if (!hasExecutingStore) {
-            // Execute Add and Mul stations
-            [...this.addStations, ...this.mulStations].forEach(station => {
-                if (station.busy) {
-                    if (station.isReady()) {
-                        station.execute();
-                        executingStations.push({
-                            operation: station.operation,
-                            tag: station.tag,
-                            time: station.time
-                        });
-                        if (station.isCompleted()) {
-                            this.busyPublishers.push(station);
-                        }
-                    } else {
-                        console.log(`${station.tag} waiting for: Qi=${station.Qi}, Qj=${station.Qj}`);
-                    }
+        // Execute computational instructions in parallel with stores
+        [...this.addStations, ...this.mulStations].forEach(station => {
+            if (station.busy && station.isReady()) {
+                station.execute();
+                executingStations.push({
+                    operation: station.operation,
+                    tag: station.tag,
+                    time: station.time
+                });
+                
+                if (station.isCompleted()) {
+                    this.busyPublishers.push(station);
                 }
-            });
-        } else {
-            console.log("Computational instructions waiting for store to complete");
-        }
+            } else if (station.busy) {
+                console.log(`${station.tag} waiting for: Qi=${station.Qi}, Qj=${station.Qj}`);
+            }
+        });
 
         return executingStations;
     }
@@ -298,6 +311,9 @@ class Processor {
         this.commonDataBus.tag = publisher.tag;
         this.commonDataBus.value = result;
 
+        // Remove only the publisher that wrote to the bus
+        this.busyPublishers.shift();
+
         return { tag: publisher.tag, value: result };
     }
 
@@ -344,7 +360,7 @@ class Processor {
 
         availableStation.busy = true;
         availableStation.operation = instruction.type;
-        availableStation.time = this.getOperationLatency(instruction.type);
+        availableStation.time = this.getLatency(instruction.type);
 
         // Check source operand dependencies
         if (instruction.src1) {
@@ -424,7 +440,7 @@ class Processor {
 
         availableStation.busy = true;
         availableStation.operation = instruction.type;
-        availableStation.time = this.getOperationLatency(instruction.type);
+        availableStation.time = this.getLatency(instruction.type);
 
         // Handle source operands
         if (instruction.src1) {
@@ -468,37 +484,36 @@ class Processor {
         availableBuffer.busy = true;
         availableBuffer.operation = instruction.type;
         availableBuffer.address = instruction.address;
-        availableBuffer.src = instruction.src;  // Save source register for dependency checking
-        availableBuffer.time = this.getOperationLatency(instruction.type);
+        availableBuffer.src = instruction.src;
 
-        // Check if source register is waiting for a result
+        // Check if the source register is waiting for a result
         const srcStatus = this.registerStatus[instruction.src];
         if (srcStatus) {
             console.log(`Store waiting for ${srcStatus} to compute ${instruction.src}`);
             availableBuffer.Q = srcStatus;
             availableBuffer.value = null;
         } else {
-            availableBuffer.Q = null;
-            availableBuffer.value = this.getRegisterValue(instruction.src).value;
+            // Even if no dependency, check if any previous instruction will write to this register
+            const willBeWritten = [...this.addStations, ...this.mulStations, ...this.loadBuffers].some(station => 
+                station.busy && station.dest === instruction.src
+            );
+            
+            if (willBeWritten) {
+                console.log(`RAW hazard: ${instruction.src} will be written by a previous instruction`);
+                availableBuffer.Q = "pending";
+                availableBuffer.value = null;
+            } else {
+                availableBuffer.Q = null;
+                availableBuffer.value = this.getRegisterValue(instruction.src).value;
+            }
         }
 
+        availableBuffer.time = this.getLatency(instruction.type);
         return availableBuffer;
     }
 
-    getOperationLatency(operation) {
-        const latencies = {
-            'L.D': 3,
-            'S.D': 2,
-            'LW': 2,
-            'SW': 2,
-            'ADD.D': 3,
-            'SUB.D': 3,
-            'MUL.D': 10,
-            'DIV.D': 20,
-            'ADDI': 1,
-            'SUBI': 1
-        };
-        return latencies[operation] || 1;
+    getLatency(operation) {
+        return this.config.latencies[operation] || 1;
     }
 
     getRegisterValue(register) {

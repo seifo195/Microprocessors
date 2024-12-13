@@ -5,13 +5,13 @@ export const parseInstruction = (instruction) => {
   const [label, ...rest] = instruction.trim().split(':');
   const actualInstruction = rest.length > 0 ? rest.join(':').trim() : label;
   
-  const parts = actualInstruction.split(/[\s,]+/);
+  const parts = actualInstruction.split(/[\s,]+/).filter(part => part !== '');
   console.log('Parts:', parts);
   
   const opcode = parts[0].toUpperCase();
   
   const result = {
-    label: rest.length > 0 ? label : null,  // If we found a ':', use the label
+    label: rest.length > 0 ? label : null,
     opcode: opcode,
     rd: null,
     rs: null,
@@ -31,12 +31,40 @@ export const parseInstruction = (instruction) => {
     case 'LD':
     case 'L.S':
     case 'L.D':
+      if (parts.length === 3) {
+        result.rd = parts[1];
+        // Check if it's using base register addressing
+        if (parts[2].includes('(')) {
+          const addressPart = parts[2].match(/(-?\d+)?\(([^)]+)\)/);
+          if (addressPart) {
+            result.immediate = addressPart[1] ? Number(addressPart[1]) : 0;
+            result.rs = addressPart[2];
+          }
+        } else {
+          // Direct addressing
+          result.immediate = Number(parts[2]);
+        }
+      }
+      break;
+
     case 'SW':
     case 'SD':
     case 'S.S':
     case 'S.D':
-      result.rd = parts[1];
-      result.immediate = Number(parts[2]);
+      if (parts.length === 3) {
+        result.rt = parts[1];  // Source register
+        // Check if it's using base register addressing
+        if (parts[2].includes('(')) {
+          const addressPart = parts[2].match(/(-?\d+)?\(([^)]+)\)/);
+          if (addressPart) {
+            result.immediate = addressPart[1] ? Number(addressPart[1]) : 0;
+            result.rs = addressPart[2];  // Base register
+          }
+        } else {
+          // Direct addressing
+          result.immediate = Number(parts[2]);
+        }
+      }
       break;
 
     case 'BNE':
@@ -63,5 +91,6 @@ export const parseInstruction = (instruction) => {
       console.error('Unknown instruction:', opcode);
   }
 
+  console.log('Parsed result:', result);
   return result;
 }; 

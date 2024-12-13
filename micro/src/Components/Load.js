@@ -12,7 +12,7 @@ const Load = ({ stationSize, stations }) => {
             <th>Busy</th>
             <th>Op</th>
             <th>Address</th>
-            <th>V</th>
+            <th>Time</th>
             <th>Q</th>
           </tr>
         </thead>
@@ -26,9 +26,9 @@ const Load = ({ stationSize, stations }) => {
                   {station.busy ? "Yes" : "No"}
                 </td>
                 <td>{station.op || "-"}</td>
-                <td>{station.address ?? "-"}</td>
-                <td>{station.Vi ?? "-"}</td>
-                <td>{station.Qi ?? "-"}</td>
+                <td>{station.address !== null ? station.address : "-"}</td>
+                <td>{station.time ?? "-"}</td>
+                <td>{station.Qi || "-"}</td>
               </tr>
             );
           })}
