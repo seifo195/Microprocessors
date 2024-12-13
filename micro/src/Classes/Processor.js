@@ -184,6 +184,25 @@ class Processor {
     executeStations() {
         const executingStations = [];
 
+        // Execute load buffers
+        this.loadBuffers.forEach(buffer => {
+            if (buffer.busy && buffer.time > 0) {
+                buffer.time--;
+                executingStations.push({
+                    operation: buffer.operation,
+                    tag: buffer.tag,
+                    time: buffer.time
+                });
+                
+                if (buffer.time === 0) {
+                    // Load is complete, get value from cache
+                    buffer.result = this.cache.getMemoryValue(buffer.address);
+                    this.busyPublishers.push(buffer);
+                    console.log(`Load completed: Read ${buffer.result} from address ${buffer.address}`);
+                }
+            }
+        });
+
         // Execute store buffers first if they're ready
         this.storeBuffers.forEach(buffer => {
             if (buffer.busy && buffer.Q === null && buffer.time > 0) {
