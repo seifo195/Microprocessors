@@ -178,7 +178,7 @@ class Cache {
     
             // Return miss information
             return {
-                data: null,
+                data: value,
                 isHit: false,
                 penalty: this.missPenalty
             };
