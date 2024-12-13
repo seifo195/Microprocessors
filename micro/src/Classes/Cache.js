@@ -84,6 +84,16 @@ class Cache {
     }
 
     cacheGet(instruction, address, value = null) {
+        // Add bounds checking at the start
+        if (address < 0 || address >= this.memory.length) {
+            return {
+                data: 0n,
+                isHit: false,
+                penalty: this.missPenalty,
+                error: "Address out of bounds"
+            };
+        }
+
         // Determine the number of bytes and operation type
         const bytesToCheck = instruction.type === "LW" || instruction.type === "L.w" ? 4 : 
                              instruction.type === "LD" || instruction.type === "L.D" ? 8 : 
@@ -104,16 +114,34 @@ class Cache {
             // Convert value to bytes
             const bytes = this.convertValueToBytes(value, bytesToCheck);
             
-            // Store in cache
+            // Check if the block exists in cache
+            const isCacheMiss = !this.Cache[blockAddress];
+
+            // If cache miss, write to memory first
+            if (isCacheMiss) {
+                // Write to memory
+                for (let i = 0; i < bytesToCheck; i++) {
+                    const currentAddress = address + i;
+                    this.Insertintomemory(currentAddress + 1, bytes[i]);
+                }
+
+                // Load the block into cache (includes the data we just wrote)
+                this.loadBlockIntoCache(address);
+                this.misses++;
+                this.accessCount++;
+
+                return {
+                    data: value,
+                    isHit: false,
+                    penalty: this.missPenalty
+                };
+            }
+            
+            // Cache hit: Store in both cache and memory
             for (let i = 0; i < bytesToCheck; i++) {
                 const currentAddress = address + i;
                 const currentBlockAddress = this.getBlockAddress(currentAddress);
                 const currentIndex = this.getIndex(currentAddress);
-    
-                // Ensure the block exists
-                if (!this.Cache[currentBlockAddress]) {
-                    this.Cache[currentBlockAddress] = new Array(this.blockSize).fill(null);
-                }
     
                 // Store byte in cache
                 this.Cache[currentBlockAddress][currentIndex] = bytes[i];
@@ -121,7 +149,9 @@ class Cache {
                 // Store byte in memory
                 this.Insertintomemory(currentAddress + 1, bytes[i]);
             }
-    
+            
+            this.hits++;
+            this.accessCount++;
             return {
                 data: value,
                 isHit: true,
@@ -169,16 +199,33 @@ class Cache {
                 penalty: this.hitLatency
             };
         } else {
-            // Cache miss: Load the entire block from memory
             this.misses++;
             this.accessCount++;
     
             // Load the block containing the address into cache
             this.loadBlockIntoCache(address);
     
-            // Return miss information
+            // After loading the block, read the data from cache
+            let intValue = 0n;
+            try {
+                for (let i = 0; i < bytesToCheck; i++) {
+                    const currentAddress = address + i;
+                    const currentBlockAddress = this.getBlockAddress(currentAddress);
+                    const currentIndex = this.getIndex(currentAddress);
+                    
+                    // Handle null values in cache by treating them as 0
+                    const byteValue = this.Cache[currentBlockAddress]?.[currentIndex] ?? 0;
+                    
+                    // Reconstruct integer by shifting and adding bytes
+                    intValue = (intValue << 8n) | BigInt(byteValue);
+                }
+            } catch (error) {
+                console.warn(`Warning: Error processing address ${address}:`, error);
+                intValue = 0n;
+            }
+    
             return {
-                data: value,
+                data: intValue,
                 isHit: false,
                 penalty: this.missPenalty
             };
