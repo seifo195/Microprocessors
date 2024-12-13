@@ -162,6 +162,6 @@ function main() {
     }, 1000);
 }
 
-main();
+// main();
 module.exports =  MultiplicationReservationStation;
 
