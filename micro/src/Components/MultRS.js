@@ -27,12 +27,14 @@ const MultRS = ({ stationSize, stations }) => {
               return (
                 <tr key={index}>
                   <td>{station.tag || `Mult${index + 1}`}</td>
-                  <td>{station.busy ? "Yes" : "No"}</td>
+                  <td className={`status-${station.busy}`}>
+                    {station.busy ? "Yes" : "No"}
+                  </td>
                   <td>{station.operation || "-"}</td>
-                  <td>{station.Vi ?? "-"}</td>
-                  <td>{station.Vj ?? "-"}</td>
-                  <td>{station.Qi ?? "-"}</td>
-                  <td>{station.Qj ?? "-"}</td>
+                  <td>{station.Vi !== null ? station.Vi : "-"}</td>
+                  <td>{station.Vj !== null ? station.Vj : "-"}</td>
+                  <td>{station.Qi || "-"}</td>
+                  <td>{station.Qj || "-"}</td>
                   <td>{station.time ?? "-"}</td>
                 </tr>
               );

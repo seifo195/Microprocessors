@@ -13,6 +13,7 @@ const Store = ({ stationSize, stations }) => {
             <th>Address</th>
             <th>V</th>
             <th>Q</th>
+            <th>Time</th>
           </tr>
         </thead>
         <tbody>
@@ -21,11 +22,14 @@ const Store = ({ stationSize, stations }) => {
             return (
               <tr key={index}>
                 <td>{station.tag || `Store${index + 1}`}</td>
-                <td>{station.busy ? "Yes" : "No"}</td>
+                <td className={`status-${station.busy}`}>
+                  {station.busy ? "Yes" : "No"}
+                </td>
                 <td>{station.op || "-"}</td>
-                <td>{station.address ?? "-"}</td>
-                <td>{station.Vi ?? "-"}</td>
-                <td>{station.Qi ?? "-"}</td>
+                <td>{station.address !== null ? station.address : "-"}</td>
+                <td>{station.Vi !== null ? station.Vi : "-"}</td>
+                <td>{station.Qi || "-"}</td>
+                <td>{station.time ?? "-"}</td>
               </tr>
             );
           })}

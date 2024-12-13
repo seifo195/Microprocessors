@@ -19,6 +19,20 @@ class Processor {
             fpRegisters: 32,
             cacheSize: 1024,
             blockSize: 64,
+            latencies: {
+                'ADD.D': 2,
+                'SUB.D': 2,
+                'MUL.D': 10,
+                'DIV.D': 40,
+                'L.D': 2,
+                'S.D': 2,
+                'ADD.S': 2,
+                'SUB.S': 2,
+                'MUL.S': 10,
+                'DIV.S': 40,
+                'L.S': 2,
+                'S.S': 2
+            },
             ...config
         };
 
@@ -144,14 +158,22 @@ class Processor {
         if (this.instructionQueue.length === 0) return null;
 
         const instruction = this.instructionQueue[0];
-        
-        // Check for WAW hazards only
+        let targetStation = null;
+
+        // Check for WAW hazards
         if (instruction.dest && this.registerStatus[instruction.dest]) {
             console.log(`WAW hazard detected: ${instruction.dest} is already waiting for ${this.registerStatus[instruction.dest]}`);
             return null;
         }
 
-        let targetStation = null;
+        // Check for WAR hazards
+        const hasWARHazard = [...this.addStations, ...this.mulStations].some(station => 
+            station.busy && (station.Qi === instruction.src1 || station.Qj === instruction.src2)
+        );
+        if (hasWARHazard) {
+            console.log(`WAR hazard detected: Source registers are being written to by previous instructions`);
+            return null;
+        }
 
         switch(instruction.type) {
             case 'ADD.D':
@@ -176,6 +198,7 @@ class Processor {
 
         if (targetStation) {
             this.instructionQueue.shift();
+            instruction.issueCycle = this.clock;
             return instruction;
         }
         return null;
@@ -363,6 +386,9 @@ class Processor {
         // Update the CDB
         this.commonDataBus.tag = publisher.tag;
         this.commonDataBus.value = result;
+
+        // Remove only the publisher that wrote to the bus
+        this.busyPublishers.shift();
 
         return { tag: publisher.tag, value: result };
     }
@@ -602,37 +628,36 @@ class Processor {
         availableBuffer.busy = true;
         availableBuffer.operation = instruction.type;
         availableBuffer.address = instruction.address;
-        availableBuffer.src = instruction.src;  // Save source register for dependency checking
-        availableBuffer.time = this.getOperationLatency(instruction.type);
+        availableBuffer.src = instruction.src;
 
-        // Check if source register is waiting for a result
+        // Check if the source register is waiting for a result
         const srcStatus = this.registerStatus[instruction.src];
         if (srcStatus) {
             console.log(`Store waiting for ${srcStatus} to compute ${instruction.src}`);
             availableBuffer.Q = srcStatus;
             availableBuffer.value = null;
         } else {
-            availableBuffer.Q = null;
-            availableBuffer.value = this.getRegisterValue(instruction.src).value;
+            // Even if no dependency, check if any previous instruction will write to this register
+            const willBeWritten = [...this.addStations, ...this.mulStations, ...this.loadBuffers].some(station => 
+                station.busy && station.dest === instruction.src
+            );
+            
+            if (willBeWritten) {
+                console.log(`RAW hazard: ${instruction.src} will be written by a previous instruction`);
+                availableBuffer.Q = "pending";
+                availableBuffer.value = null;
+            } else {
+                availableBuffer.Q = null;
+                availableBuffer.value = this.getRegisterValue(instruction.src).value;
+            }
         }
 
+        availableBuffer.time = this.getLatency(instruction.type);
         return availableBuffer;
     }
 
-    getOperationLatency(operation) {
-        const latencies = {
-            'L.D': 3,
-            'S.D': 2,
-            'LW': 2,
-            'SW': 2,
-            'ADD.D': 3,
-            'SUB.D': 3,
-            'MUL.D': 10,
-            'DIV.D': 20,
-            'ADDI': 1,
-            'SUBI': 1
-        };
-        return latencies[operation] || 1;
+    getLatency(operation) {
+        return this.config.latencies[operation] || 1;
     }
 
     getRegisterValue(register) {

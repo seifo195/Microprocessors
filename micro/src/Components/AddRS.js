@@ -14,7 +14,7 @@ const AddRS = ({ stationSize, stations }) => {
             <th>Vk</th>
             <th>Qj</th>
             <th>Qk</th>
-            <th>A</th>
+            <th>Time</th>
           </tr>
         </thead>
         <tbody>
@@ -23,13 +23,15 @@ const AddRS = ({ stationSize, stations }) => {
             return (
               <tr key={index}>
                 <td>{station.tag || `Add${index + 1}`}</td>
-                <td>{station.busy ? "Yes" : "No"}</td>
+                <td className={`status-${station.busy}`}>
+                  {station.busy ? "Yes" : "No"}
+                </td>
                 <td>{station.operation || "-"}</td>
-                <td>{station.Vj ?? "-"}</td>
-                <td>{station.Vk ?? "-"}</td>
-                <td>{station.Qj ?? "-"}</td>
-                <td>{station.Qk ?? "-"}</td>
-                <td>{station.A ?? "-"}</td>
+                <td>{station.Vi !== null ? station.Vi : "-"}</td>
+                <td>{station.Vj !== null ? station.Vj : "-"}</td>
+                <td>{station.Qi || "-"}</td>
+                <td>{station.Qj || "-"}</td>
+                <td>{station.time ?? "-"}</td>
               </tr>
             );
           })}
