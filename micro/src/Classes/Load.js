@@ -1,15 +1,23 @@
 class LoadReservationStation {
-    constructor(tag, busy, address, Qi, time) {
+    constructor(tag, busy, op, address, Qi, time, cache) {
         this.tag = tag; 
         this.busy = busy; 
+        this.op = op;
         this.address = address; 
         this.Qi = Qi; 
         this.time = time; 
         this.result = null; 
         this.operationPerformed = false; 
+        this.cache = cache; // Reference to cache instance
     }
 
-    execute(memory) {
+    validateOperation() {
+        if (!["LW", "LD", "L.S", "L.D"].includes(this.op)) {
+            throw new Error(`Invalid operation ${this.op} in station ${this.tag}`);
+        }
+    }
+
+    execute() {
         if (!this.busy || this.time <= 0) return;
 
         // Wait for dependencies to be resolved
@@ -19,11 +27,20 @@ class LoadReservationStation {
         }
 
         if (!this.operationPerformed) {
-            if (this.address in memory) {
-                this.result = memory[this.address];
+            this.validateOperation();
+            // Fetch data from the cache using cacheGet
+            const { data, isHit, penalty } = this.cache.cacheGet({ type: this.op }, this.address);
+
+            // Update time with cache penalty if applicable
+            this.time += penalty;
+
+            if (data !== undefined) {
+                this.result = data;
+                console.log(`Load Station ${this.tag} fetched data: ${data} (Cache hit: ${isHit})`);
             } else {
-                console.error(`Memory address ${this.address} not found.`);
+                console.error(`Load Station ${this.tag} failed to fetch data at address ${this.address}.`);
             }
+
             this.operationPerformed = true;
         }
 
@@ -39,11 +56,12 @@ class LoadReservationStation {
     clear() {
         if (this.isCompleted()) {
             this.busy = false;
+            this.op = null;
             this.address = null;
             this.Qi = null;
             this.time = 0;
             this.result = null;
-            this.operationPerformed = false; 
+            this.operationPerformed = false;
         }
     }
 
