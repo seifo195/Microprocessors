@@ -12,5 +12,4 @@ function main() {
     // console.log(memory);
 }
 main();
-
-module.exports = Memory;
+module.exports =  Memory;
