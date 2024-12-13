@@ -160,12 +160,6 @@ class Processor {
         const instruction = this.instructionQueue[0];
         let targetStation = null;
 
-        // Check for WAW hazards
-        if (instruction.dest && this.registerStatus[instruction.dest]) {
-            console.log(`WAW hazard detected: ${instruction.dest} is already waiting for ${this.registerStatus[instruction.dest]}`);
-            return null;
-        }
-
         // Check for WAR hazards
         const hasWARHazard = [...this.addStations, ...this.mulStations].some(station => 
             station.busy && (station.Qi === instruction.src1 || station.Qj === instruction.src2)
@@ -303,94 +297,60 @@ class Processor {
     
 
     handleWriteBack() {
-        if (this.busyPublishers.length === 0) return null;
+        if (this.busyPublishers.length === 0) return;
 
-        const publisher = this.busyPublishers.shift();
-        let result = publisher.result || publisher.broadcast();
-        const executingStations = [];
+        // Get the first publisher that's ready to write back
+        const publisher = this.busyPublishers[0];
+        
+        // Check if the publisher has completed execution
+        if (!publisher.isCompleted()) return;
 
-
-        // Update load buffers' dependencies
-        this.loadBuffers.forEach(buffer => {
-            if (buffer.busy && buffer.Qi === publisher.tag) {
-                buffer.Qi = null;  // Clear the dependency
-                console.log(`Load buffer ${buffer.tag} dependency resolved from ${publisher.tag}`);
-            }
-        });
-
+        let result;
+        // Check if it's a store buffer (which doesn't have broadcast)
         if (publisher.tag.startsWith('STORE')) {
-            result = publisher.value;
-            console.log(`Store completed: ${publisher.tag}`);
-            publisher.busy = false;
-
-            // Update any ADD/MUL stations waiting on this store
-            [...this.addStations, ...this.mulStations].forEach(station => {
-                if (station.busy) {
-                    if (station.Qi === publisher.tag) {
-                        station.Qi = null;
-                        station.Vi = result;
-                        console.log(`Updated station ${station.tag} Qi dependency on ${publisher.tag}`);
-                    }
-                    if (station.Qj === publisher.tag) {
-                        station.Qj = null;
-                        station.Vj = result;
-                        console.log(`Updated station ${station.tag} Qj dependency on ${publisher.tag}`);
-                    }
-                }
-            });
+            // Store buffers don't produce results to broadcast
+            result = null;
         } else {
-            // For computational units (ADD, MUL, LOAD)
-            result = publisher.broadcast();
-            
-            // Update store buffers and track if result will be stored
-            let resultWillBeStored = false;
-            this.storeBuffers.forEach(buffer => {
-                if (buffer.busy && buffer.Q === publisher.tag) {
-                    buffer.value = result;
-                    buffer.Q = null;
-                    buffer.time--;  // Decrement time immediately
-                    resultWillBeStored = true;
-                    console.log(`Updated store buffer with value ${result}`);
-                    console.log(`Store starting execution, time remaining: ${buffer.time}`);
-                }
-            });
-
-            // Update Add and Mul stations
-            [...this.addStations, ...this.mulStations].forEach(station => {
-                if (station.busy) {
-                    if (station.Qi === publisher.tag && resultWillBeStored) {
-                        station.Qi = 'STORE0';  // Set dependency to store
-                    } else if (station.Qi === publisher.tag) {
-                        station.updateQ(publisher.tag, result);
-                    }
-                    if (station.Qj === publisher.tag && resultWillBeStored) {
-                        station.Qj = 'STORE0';  // Set dependency to store
-                    } else if (station.Qj === publisher.tag) {
-                        station.updateQ(publisher.tag, result);
-                    }
-                }
-            });
-
-            // Update register status and value
-            Object.entries(this.registerStatus).forEach(([reg, tag]) => {
-                if (tag === publisher.tag) {
-                    delete this.registerStatus[reg];
-                    this.updateRegister(reg, { value: result });
-                    console.log(`Updated register ${reg} with value ${result}`);
-                }
-            });
-
-            publisher.clear();
+            // For other stations that have broadcast
+            result = publisher.result;
         }
 
-        // Update the CDB
-        this.commonDataBus.tag = publisher.tag;
-        this.commonDataBus.value = result;
+        // Find the corresponding instruction
+        const instruction = this.instructionQueue.find(
+            inst => !inst.writeResultCycle && inst.executeEndCycle
+        );
 
-        // Remove only the publisher that wrote to the bus
+        if (instruction && instruction.dest && result !== null) {
+            // Update the register file (skip for store instructions)
+            if (instruction.type.includes('.D') || instruction.type.includes('.S')) {
+                const regNum = parseInt(instruction.dest.substring(1));
+                this.registerFile.floating[regNum] = result;
+            } else {
+                const regNum = parseInt(instruction.dest.substring(1));
+                this.registerFile.integer[regNum] = result;
+            }
+            instruction.writeResultCycle = this.clock;
+        } else if (instruction && instruction.type.startsWith('S')) {
+            // Mark store instruction as completed
+            instruction.writeResultCycle = this.clock;
+        }
+
+        // Update any dependent stations (only if there's a result to broadcast)
+        if (result !== null) {
+            this.updateDependentStations(publisher.tag, result);
+        }
+
+        // Remove the publisher from busy list and clear it
         this.busyPublishers.shift();
+        publisher.clear();
 
-        return { tag: publisher.tag, value: result };
+        // Update the CDB status (only for non-store operations)
+        if (result !== null) {
+            this.commonDataBus = {
+                tag: publisher.tag,
+                value: result
+            };
+        }
     }
 
     issueToLoadBuffer(instruction) {
@@ -693,54 +653,33 @@ class Processor {
 
     updateStatus() {
         return {
-            clock: this.clock,
+            instructionQueue: this.instructionQueue.map(inst => ({
+                ...inst
+            })),
             addStations: this.addStations.map(station => ({
-                tag: station.tag,
-                busy: station.busy,
-                operation: station.operation,
-                Vi: station.Vi,
-                Vj: station.Vj,
-                Qi: station.Qi,
-                Qj: station.Qj,
-                time: station.time,
-                result: station.result
+                ...station
             })),
             mulStations: this.mulStations.map(station => ({
-                tag: station.tag,
-                busy: station.busy,
-                operation: station.operation,
-                Vi: station.Vi,
-                Vj: station.Vj,
-                Qi: station.Qi,
-                Qj: station.Qj,
-                time: station.time,
-                result: station.result
+                ...station
             })),
             loadBuffers: this.loadBuffers.map(buffer => ({
-                tag: buffer.tag,
-                busy: buffer.busy,
-                address: buffer.address,
-                time: buffer.time,
-                result: buffer.result
+                ...buffer
             })),
             storeBuffers: this.storeBuffers.map(buffer => ({
-                tag: buffer.tag,
-                busy: buffer.busy,
-                address: buffer.address,
-                value: buffer.value,
-                Q: buffer.Q,
-                time: buffer.time
+                ...buffer
             })),
-            registerFile: {
-                integer: [...this.registerFile.integer],
-                floating: [...this.registerFile.floating]
+            registers: {
+                // Create deep copies of register files
+                integer: { ...this.registerFile.integer },
+                floating: { ...this.registerFile.floating }
             },
-            registerStatus: { ...this.registerStatus },
+            cache: this.cache,
+            clock: this.clock,
+            // Add CDB status
             cdb: {
-                tag: this.commonDataBus.tag,
-                value: this.commonDataBus.value
-            },
-            instructionQueue: [...this.instructionQueue]
+                tag: null,
+                value: null
+            }
         };
     }
 
@@ -807,11 +746,67 @@ class Processor {
         });
 
         console.log("\nCommon Data Bus:");
-        if (status.cdb.tag) {
+        if (status.cdb && status.cdb.tag) {
             console.log(`Tag: ${status.cdb.tag}, Value: ${status.cdb.value}`);
         } else {
             console.log("Empty");
         }
+    }
+
+    getOperationLatency(operation) {
+        // Return the latency from the config for the given operation
+        return this.config.latencies[operation] || 1;
+    }
+
+    writeResult() {
+        const completedStations = [
+            ...this.addStations,
+            ...this.mulStations,
+            ...this.loadBuffers
+        ].filter(station => station.isCompleted());
+
+        for (const station of completedStations) {
+            // Get the result
+            const result = station.broadcast();
+            
+            // Find instructions waiting for this result
+            const waitingInstructions = this.instructionQueue.filter(
+                inst => !inst.writeResultCycle && inst.executeEndCycle
+            );
+
+            for (const inst of waitingInstructions) {
+                if (inst.dest) {
+                    // Update the register file
+                    if (inst.type.includes('.D') || inst.type.includes('.S')) {
+                        const regNum = parseInt(inst.dest.substring(1));
+                        this.registerFile.floating[regNum] = result;
+                    } else {
+                        const regNum = parseInt(inst.dest.substring(1));
+                        this.registerFile.integer[regNum] = result;
+                    }
+                    inst.writeResultCycle = this.clock;
+                }
+            }
+
+            // Update any dependent stations
+            this.updateDependentStations(station.tag, result);
+            
+            // Clear the completed station
+            station.clear();
+        }
+
+        // Update processor state after writing results
+        this.processorState = this.updateStatus();
+    }
+
+    updateDependentStations(tag, value) {
+        // Update all stations that depend on this result
+        [...this.addStations, ...this.mulStations, ...this.loadBuffers, ...this.storeBuffers]
+            .forEach(station => {
+                if (station.busy) {
+                    station.updateQ(tag, value);
+                }
+            });
     }
 }
 
