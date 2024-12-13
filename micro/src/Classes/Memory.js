@@ -9,7 +9,8 @@ function getMemory(size) {
 }
 function main() {
     const memory = getMemory(1024);
-    console.log(memory);
+    // console.log(memory);
 }
 main();
-export default Memory;
+
+module.exports = Memory;
